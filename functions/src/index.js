@@ -23,7 +23,8 @@ initializeApp();
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL_SONNET = "claude-sonnet-4-20250514";
+const MODEL_HAIKU  = "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `You are Dr. Yello, the intelligent AI medical assistant for Yello | Clinics and Diagnostics. You are warm, empathetic, knowledgeable, and speak like a real doctor — not like a bot.
 
@@ -66,6 +67,32 @@ Keep responses conversational — 2-4 sentences unless more detail is genuinely 
  * Response:
  *   { reply: string }
  */
+
+function selectModel(messages) {
+  const lastMessage = messages[messages.length - 1]?.content?.toLowerCase() || "";
+
+  // Keywords that suggest complexity → use Sonnet
+  const complexKeywords = [
+    "chest pain", "difficulty breathing", "heart", "cancer", "diabetes",
+    "pregnant", "pregnancy", "mental health", "depression", "anxiety",
+    "blood", "surgery", "chronic", "severe", "stroke", "unconscious",
+    "allergic", "infection", "medication", "prescription"
+  ];
+
+  const isComplex = complexKeywords.some(k => lastMessage.includes(k));
+
+  // Long conversations (10+ turns) also get Sonnet — more context needed
+  const isLongConversation = messages.length >= 10;
+
+  if (isComplex || isLongConversation) {
+    console.log("[Model Router] → Sonnet (complex)");
+    return MODEL_SONNET;
+  }
+
+  console.log("[Model Router] → Haiku (simple)");
+  return MODEL_HAIKU;
+}
+
 exports.askDoctor = onCall(
   {
     secrets: [ANTHROPIC_API_KEY],
@@ -102,7 +129,7 @@ exports.askDoctor = onCall(
           "x-api-key": ANTHROPIC_API_KEY.value(),
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: selectModel(sanitised),
           max_tokens: 800,
           system: SYSTEM_PROMPT,
           messages: sanitised,
