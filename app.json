@@ -15,13 +15,20 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.sublimeinsanity.Yello"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-community/datetimepicker"
-    ]
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6d24e50b-70b1-449e-ae8f-a4ba803296d3"
+      }
+    }
   }
 }

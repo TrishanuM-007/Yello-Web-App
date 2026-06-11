@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Switch, ScrollView, TextInput, Alert, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
 import ClayCard from '../components/ClayCard';
@@ -16,14 +17,18 @@ export default function PatientSettingsScreen({ navigation }) {
     name: '',
     dob: new Date(),
     address: '',
+    area: '',
+    postcode: '',
     allergies: '',
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [hasDob, setHasDob] = useState(false);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [])
+  );
 
   const loadProfile = async () => {
     try {
@@ -45,6 +50,8 @@ export default function PatientSettingsScreen({ navigation }) {
             name: data.name || '',
             dob: dobDate,
             address: data.address || '',
+            area: data.area || '',
+            postcode: data.postcode || '',
             allergies: data.allergies || '',
           });
           setHasDob(existingDob);
@@ -190,11 +197,27 @@ export default function PatientSettingsScreen({ navigation }) {
           editable={false}
         />
 
-        <Text style={dynamicStyles.label}>Address</Text>
+        <Text style={dynamicStyles.label}>Full Address</Text>
         <TextInput
           style={dynamicStyles.input}
           value={profile.address}
           onChangeText={(val) => setProfile({ ...profile, address: val })}
+          placeholderTextColor={theme.colors.textLight}
+        />
+
+        <Text style={dynamicStyles.label}>Area</Text>
+        <TextInput
+          style={dynamicStyles.input}
+          value={profile.area}
+          onChangeText={(val) => setProfile({ ...profile, area: val })}
+          placeholderTextColor={theme.colors.textLight}
+        />
+
+        <Text style={dynamicStyles.label}>Postcode/ZIP</Text>
+        <TextInput
+          style={dynamicStyles.input}
+          value={profile.postcode}
+          onChangeText={(val) => setProfile({ ...profile, postcode: val })}
           placeholderTextColor={theme.colors.textLight}
         />
 

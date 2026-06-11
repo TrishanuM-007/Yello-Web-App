@@ -9,6 +9,7 @@ import ManageTestsScreen from '../screens/admin/ManageTestsScreen';
 import UploadTestReportScreen from '../screens/admin/UploadTestReportScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import PendingApprovalsScreen from '../screens/admin/PendingApprovalsScreen';
+import OngoingServicesScreen from '../screens/admin/OngoingServicesScreen';
 import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
@@ -66,6 +67,11 @@ export default function AdminNavigator() {
         name="PendingApprovals" 
         component={PendingApprovalsScreen} 
         options={{ title: 'Pending', tabBarLabel: 'Pending' }} 
+      />
+      <Tab.Screen 
+        name="OngoingServices" 
+        component={OngoingServicesScreen} 
+        options={{ title: 'Ongoing', tabBarLabel: 'Ongoing' }} 
       />
       <Tab.Screen 
         name="UploadTestReport" 

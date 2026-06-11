@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { auth, db } from '../config/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
+import { registerForPushNotificationsAsync, scheduleAppointmentReminder } from '../utils/NotificationSetup';
 
 export default function ScheduleScreen() {
   const { theme, isDarkMode } = useTheme();
@@ -27,8 +28,26 @@ export default function ScheduleScreen() {
       return;
     }
 
+    // Setup push notifications and save token
+    const setupNotifications = async () => {
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (token) {
+          const patientRef = doc(db, 'patients', user.uid);
+          await updateDoc(patientRef, {
+            expoPushToken: token
+          });
+          console.log('Saved push token to patient profile:', token);
+        }
+      } catch (error) {
+        console.error('Push notification registration failed:', error);
+      }
+    };
+    setupNotifications();
+
     let appointments = [];
     let reports = [];
+    let tests = [];
     let doctorsMap = {};
 
     const updateTimeline = () => {
@@ -126,7 +145,7 @@ export default function ScheduleScreen() {
         }
       });
 
-      const combined = [...mergedAppointments, ...reports];
+      const combined = [...mergedAppointments, ...reports, ...tests];
       
       // Sort chronologically (ascending: earliest first)
       combined.sort((a, b) => {
@@ -137,6 +156,20 @@ export default function ScheduleScreen() {
           return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
         }
         return dateA.localeCompare(dateB);
+      });
+
+      // Schedule reminders
+      combined.forEach(item => {
+        if (item.type === 'appointment') {
+          const startTime = item.time ? item.time.split(' - ')[0] : null;
+          if (startTime) {
+            scheduleAppointmentReminder(`Dr. ${item.doctorName}`, item.date, startTime);
+          }
+        } else if (item.type === 'test') {
+          if (item.requestedDate && item.requestedTime) {
+            scheduleAppointmentReminder(item.testName, item.requestedDate, item.requestedTime);
+          }
+        }
       });
       
       setTimelineData(combined);
@@ -157,7 +190,8 @@ export default function ScheduleScreen() {
     const qAppointments = query(
       collection(db, 'available_slots'),
       where('patientId', '==', user.uid),
-      where('isBooked', '==', true)
+      where('isBooked', '==', true),
+      where('status', '==', 'confirmed')
     );
 
     const unsubAppointments = onSnapshot(qAppointments, (snapshot) => {
@@ -184,22 +218,45 @@ export default function ScheduleScreen() {
       updateTimeline();
     });
 
+    // Listener 3: Confirmed Tests
+    const qTests = query(
+      collection(db, 'test_requests'),
+      where('patientId', '==', user.uid),
+      where('status', '==', 'confirmed')
+    );
+
+    const unsubTests = onSnapshot(qTests, (snapshot) => {
+      tests = snapshot.docs.map(doc => ({
+        id: doc.id,
+        type: 'test',
+        ...doc.data()
+      }));
+      updateTimeline();
+    });
+
     return () => {
       unsubDoctors();
       unsubAppointments();
       unsubReports();
+      unsubTests();
     };
   }, []);
 
   const renderTimelineItem = ({ item, index }) => {
     const isAppointment = item.type === 'appointment';
-    const title = isAppointment ? 'Doctor Appointment' : (item.testName ? `${item.testName} Report` : 'Test Report');
-    const dotColor = isAppointment ? theme.colors.primary : '#555555';
-    const iconName = isAppointment ? 'calendar-outline' : 'document-text-outline';
+    const isTest = item.type === 'test';
+    
+    let title = 'Event';
+    if (isAppointment) title = 'Doctor Appointment';
+    else if (isTest) title = `Lab Test: ${item.testName}`;
+    else title = item.testName ? `${item.testName} Report` : 'Test Report';
+
+    const dotColor = isAppointment ? theme.colors.primary : (isTest ? '#FFA500' : '#555555');
+    const iconName = isAppointment ? 'calendar-outline' : (isTest ? 'flask-outline' : 'document-text-outline');
     
     // Fallback to createdAt if date/time are missing
-    const displayDate = item.date || item.createdAt?.split('T')[0] || 'Unknown Date';
-    const displayTime = item.time || (item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '');
+    const displayDate = item.date || item.requestedDate || item.createdAt?.split('T')[0] || 'Unknown Date';
+    const displayTime = item.time || item.requestedTime || (item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '');
 
     return (
       <View style={styles.timelineItemContainer}>

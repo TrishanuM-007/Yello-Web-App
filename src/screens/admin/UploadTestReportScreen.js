@@ -1,187 +1,172 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import 'fast-text-encoding';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Image, ScrollView } from 'react-native';
+import { PDFDocument, rgb } from 'pdf-lib';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useTheme } from '../../context/ThemeContext';
 import ClayButton from '../../components/ClayButton';
 import ClayCard from '../../components/ClayCard';
-import { db } from '../../config/firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
-import { Picker } from '@react-native-picker/picker';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 
 export default function UploadTestReportScreen() {
   const { theme, isDarkMode } = useTheme();
   const styles = getStyles(theme, isDarkMode);
 
-  const [patients, setPatients] = useState([]);
-  const [selectedPatientId, setSelectedPatientId] = useState('');
-  const [testName, setTestName] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [logoUri, setLogoUri] = useState(null);
+  const [logoBase64, setLogoBase64] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [fetchingPatients, setFetchingPatients] = useState(true);
-
-  useEffect(() => {
-    fetchPatients();
-  }, []);
-
-  const fetchPatients = async () => {
+  const pickLogo = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'patients'));
-      const patientsList = [];
-      querySnapshot.forEach((doc) => {
-        patientsList.push({ id: doc.id, ...doc.data() });
-      });
-      setPatients(patientsList);
-      if (patientsList.length > 0) {
-        setSelectedPatientId(patientsList[0].id);
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to fetch patients from database.');
-    } finally {
-      setFetchingPatients(false);
-    }
-  };
-
-  const handlePickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+        base64: true
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setSelectedFile(result.assets[0]);
+        setLogoUri(result.assets[0].uri);
+        setLogoBase64(result.assets[0].base64);
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to pick document.');
+      console.error('Error picking logo:', error);
+      Alert.alert('Error', 'Failed to pick a logo.');
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedPatientId || !testName || !selectedFile) {
-      Alert.alert('Error', 'Please fill in all fields and select a PDF file.');
+  const applyBrandingToPDF = async (pdfUri, currentLogoBase64) => {
+    // Read PDF directly into an ArrayBuffer
+    const pdfResponse = await fetch(pdfUri);
+    const pdfBuffer = await pdfResponse.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    
+    // Embed the logo (pdf-lib takes the Base64 directly!)
+    let embeddedLogo;
+    try {
+      embeddedLogo = await pdfDoc.embedPng(currentLogoBase64);
+    } catch (pngError) {
+      try {
+        embeddedLogo = await pdfDoc.embedJpg(currentLogoBase64);
+      } catch (jpgError) {
+        throw new Error('The selected logo could not be embedded.');
+      }
+    }
+    
+    // Scale it
+    const logoDims = embeddedLogo.scale(0.25);
+    
+    // Loop through every page
+    const pages = pdfDoc.getPages();
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      
+      // Element 1 (Address)
+      page.drawText('Address: GV Pride, 3rd Floor Gandipet Main Rd, Kokapet 500075, Telangana, India', { 
+        x: 50, 
+        y: height - 40, 
+        size: 10, 
+        color: rgb(0.3, 0.3, 0.3) 
+      });
+      
+      // Element 2 (Contact)
+      page.drawText('www.yelloclinics.com | info@yelloclinics.com | @yello.medi', { 
+        x: 50, 
+        y: height - 55, 
+        size: 10, 
+        color: rgb(0.3, 0.3, 0.3) 
+      });
+      
+      // Element 3 (Logo Image)
+      page.drawImage(embeddedLogo, { 
+        x: width - logoDims.width - 40, 
+        y: height - logoDims.height - 30, 
+        width: logoDims.width, 
+        height: logoDims.height 
+      });
+      
+      // Element 4 (Sub-branding Text)
+      page.drawText('Clinics Diagnostics', { 
+        x: width - 150, 
+        y: height - logoDims.height - 45, 
+        size: 12, 
+        color: rgb(0.3, 0.3, 0.3) 
+      });
+    }
+    
+    return await pdfDoc.saveAsBase64();
+  };
+
+  const handleFormatAndSave = async () => {
+    if (!logoUri) {
+      Alert.alert('Missing Logo', 'Please select a clinic logo first.');
       return;
     }
 
-    setLoading(true);
     try {
-      // 1. Upload to Cloudinary using Base64 JSON payload
-      const base64String = await FileSystem.readAsStringAsync(selectedFile.uri, {
-        encoding: FileSystem.EncodingType.Base64
-      });
-      const base64File = 'data:application/pdf;base64,' + base64String;
-
-      const response = await fetch('https://api.cloudinary.com/v1_1/dveoylowg/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          file: base64File,
-          upload_preset: 'yello_reports'
-        })
-      });
-
-      const cloudinaryData = await response.json();
-
-      if (!cloudinaryData.secure_url) {
-        throw new Error('Cloudinary upload failed: secure_url missing');
+      const docRes = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+      
+      if (docRes.canceled || !docRes.assets || docRes.assets.length === 0) {
+        return;
       }
 
-      const pdfUrl = cloudinaryData.secure_url;
-
-      // 2. Save to Firestore
-      const reportsRef = collection(db, 'test_reports');
-      await addDoc(reportsRef, {
-        patientId: selectedPatientId,
-        testName,
-        pdfUrl,
-        uploadDate: new Date().toISOString()
-      });
-
-      Alert.alert('Success', 'Test report uploaded successfully!');
-
-      // Reset form
-      setTestName('');
-      setSelectedFile(null);
-
+      setIsProcessing(true);
+      
+      const brandedBase64 = await applyBrandingToPDF(docRes.assets[0].uri, logoBase64);
+      
+      const outputUri = FileSystem.documentDirectory + 'YelloMedi_Report_Formatted.pdf';
+      await FileSystem.writeAsStringAsync(outputUri, brandedBase64, { encoding: FileSystem.EncodingType.Base64 });
+      
+      await Sharing.shareAsync(outputUri);
+      
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to upload report. Please try again.');
+      console.error('Error formatting PDF:', error);
+      Alert.alert('Error', 'An error occurred while formatting the PDF.');
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Upload Test Report</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <Text style={styles.title}>Format Report</Text>
 
-        <ClayCard style={styles.form}>
-          <Text style={styles.label}>Patient</Text>
-          <View style={styles.pickerContainer}>
-            {fetchingPatients ? (
-              <Text style={{ padding: theme.spacing.md, color: isDarkMode ? '#FFFFFF' : theme.colors.textLight }}>Loading patients...</Text>
-            ) : (
-              <Picker
-                selectedValue={selectedPatientId}
-                onValueChange={(itemValue) => setSelectedPatientId(itemValue)}
-                style={styles.picker}
-              >
-                {patients.map(patient => (
-                  <Picker.Item
-                    key={patient.id}
-                    label={`${patient.name} (${patient.phoneNumber})`}
-                    value={patient.id}
-                  />
-                ))}
-              </Picker>
-            )}
-          </View>
-
-          <Text style={styles.label}>Test Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Complete Blood Count (CBC)"
-            placeholderTextColor={theme.colors.textLight}
-            value={testName}
-            onChangeText={setTestName}
-          />
-
-          <Text style={styles.label}>PDF Report File</Text>
-          <View style={styles.fileContainer}>
-            <Text
-              style={styles.fileText}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {selectedFile ? selectedFile.name : 'No file selected'}
-            </Text>
-            <ClayButton
-              title="Browse"
-              onPress={handlePickDocument}
-              variant="secondary"
-              style={styles.browseButton}
-              textStyle={{ fontSize: 14 }}
+      <ClayCard style={styles.card}>
+        <Text style={styles.label}>1. Select Clinic Logo</Text>
+        <ClayButton
+          title="Pick Logo Image"
+          onPress={pickLogo}
+          variant="secondary"
+          style={styles.button}
+        />
+        
+        {logoUri && (
+          <View style={styles.previewContainer}>
+            <Image 
+              source={{ uri: logoUri }} 
+              style={{ width: 100, height: 100, resizeMode: 'contain' }} 
             />
           </View>
+        )}
 
-          <ClayButton
-            title="Upload Report"
-            onPress={handleUpload}
-            loading={loading}
-            style={{ marginTop: theme.spacing.xl }}
-          />
-        </ClayCard>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Text style={[styles.label, { marginTop: theme.spacing.xl }]}>2. Select & Format PDF</Text>
+        <ClayButton
+          title="Select & Format PDF"
+          onPress={handleFormatAndSave}
+          style={styles.button}
+          disabled={isProcessing}
+        />
+        
+        {isProcessing && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.loadingText}>Processing PDF...</Text>
+          </View>
+        )}
+      </ClayCard>
+    </ScrollView>
   );
 }
 
@@ -199,59 +184,35 @@ const getStyles = (theme, isDarkMode) => StyleSheet.create({
     color: isDarkMode ? '#FFFFFF' : theme.colors.text,
     marginBottom: theme.spacing.xl,
   },
-  form: {
+  card: {
     width: '100%',
+    padding: theme.spacing.lg,
   },
   label: {
     ...theme.typography.title,
-    fontSize: 14,
+    fontSize: 16,
     color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    marginBottom: theme.spacing.xs,
-    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.body.fontSize,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    backgroundColor: theme.colors.background,
-    marginBottom: theme.spacing.sm,
+  button: {
+    marginBottom: theme.spacing.md,
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.background,
-    marginBottom: theme.spacing.sm,
-    overflow: 'hidden',
-  },
-  picker: {
-    width: '100%',
-    height: 50,
-  },
-  fileContainer: {
-    flexDirection: 'row',
+  previewContainer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
+    marginVertical: theme.spacing.md,
+    padding: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
-    paddingLeft: theme.spacing.md,
-    backgroundColor: theme.colors.background,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
   },
-  fileText: {
-    flex: 1,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.textLight,
-    marginRight: theme.spacing.sm,
+  loadingContainer: {
+    marginTop: theme.spacing.lg,
+    alignItems: 'center',
   },
-  browseButton: {
-    width: 'auto',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    margin: theme.spacing.xs,
-    borderRadius: theme.borderRadius.md,
+  loadingText: {
+    marginTop: theme.spacing.sm,
+    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
+    ...theme.typography.body,
   }
 });

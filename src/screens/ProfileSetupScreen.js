@@ -29,6 +29,8 @@ export default function ProfileSetupScreen({ route, navigation }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [gender, setGender] = useState('');
   const [address, setAddress] = useState('');
+  const [area, setArea] = useState('');
+  const [postcode, setPostcode] = useState('');
   const [allergies, setAllergies] = useState('');
   const [medicalHistory, setMedicalHistory] = useState('');
   const [insuranceInfo, setInsuranceInfo] = useState('');
@@ -37,8 +39,8 @@ export default function ProfileSetupScreen({ route, navigation }) {
   const [toastVisible, setToastVisible] = useState(false);
 
   const handleCompleteSetup = async () => {
-    if (!name.trim() || !gender.trim() || !address.trim()) {
-      Alert.alert('Required Fields', 'Please fill in your Name, Gender, and Address.');
+    if (!name.trim() || !gender.trim() || !address.trim() || !area.trim() || !postcode.trim()) {
+      Alert.alert('Required Fields', 'Please fill in your Name, Gender, and full Address details.');
       return;
     }
 
@@ -51,6 +53,8 @@ export default function ProfileSetupScreen({ route, navigation }) {
         gender,
         phoneNumber,
         address,
+        area,
+        postcode,
         allergies,
         medicalHistory,
         insuranceInfo,
@@ -137,13 +141,31 @@ export default function ProfileSetupScreen({ route, navigation }) {
             editable={false}
           />
 
-          <Text style={styles.label}>Address *</Text>
+          <Text style={styles.label}>Full Address *</Text>
           <TextInput
             style={styles.input}
             placeholder="123 Main St, City"
             placeholderTextColor={theme.colors.textLight}
             value={address}
             onChangeText={setAddress}
+          />
+
+          <Text style={styles.label}>Area *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Downtown"
+            placeholderTextColor={theme.colors.textLight}
+            value={area}
+            onChangeText={setArea}
+          />
+
+          <Text style={styles.label}>Postcode/ZIP *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. 10001"
+            placeholderTextColor={theme.colors.textLight}
+            value={postcode}
+            onChangeText={setPostcode}
           />
 
           <Text style={styles.label}>Allergies (Optional)</Text>

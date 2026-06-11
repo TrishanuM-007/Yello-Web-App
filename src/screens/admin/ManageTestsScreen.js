@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import ClayButton from '../../components/ClayButton';
 import ClayCard from '../../components/ClayCard';
 import { db } from '../../config/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ManageTestsScreen() {
   const { theme, isDarkMode } = useTheme();
@@ -13,6 +14,19 @@ export default function ManageTestsScreen() {
   const [testName, setTestName] = useState('');
   const [price, setPrice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [tests, setTests] = useState([]);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'available_tests'), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort so newest are first
+      data.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setTests(data);
+      setFetching(false);
+    });
+    return () => unsub();
+  }, []);
 
   const handleSubmit = async () => {
     if (!testName || !price) {
@@ -40,12 +54,30 @@ export default function ManageTestsScreen() {
     }
   };
 
+  const handleDelete = (id) => {
+    Alert.alert('Confirm Delete', 'Are you sure you want to completely remove this test? Patients will no longer see it.', [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Delete', 
+        style: 'destructive', 
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, 'available_tests', id));
+          } catch (e) {
+            console.error(e);
+            Alert.alert('Error', 'Could not delete test');
+          }
+        }
+      }
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Add New Test</Text>
 
         <ClayCard style={styles.form}>
@@ -75,6 +107,27 @@ export default function ManageTestsScreen() {
             style={{ marginTop: theme.spacing.xl }}
           />
         </ClayCard>
+
+        <Text style={[styles.title, { marginTop: 40 }]}>Published Tests</Text>
+        {fetching ? (
+          <ActivityIndicator color={theme.colors.primary} />
+        ) : tests.length === 0 ? (
+          <Text style={{color: theme.colors.textLight}}>No tests published yet.</Text>
+        ) : (
+          tests.map(test => (
+            <ClayCard key={test.id} style={styles.testCard}>
+              <View style={styles.testCardInner}>
+                <View style={styles.testInfo}>
+                  <Text style={styles.testCardName}>{test.testName || test.name}</Text>
+                  <Text style={styles.testCardPrice}>₹{test.price}</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleDelete(test.id)} style={styles.deleteButton}>
+                  <Ionicons name="trash-outline" size={24} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            </ClayCard>
+          ))
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -114,4 +167,30 @@ const getStyles = (theme, isDarkMode) => StyleSheet.create({
     backgroundColor: theme.colors.background,
     marginBottom: theme.spacing.sm,
   },
+  testCard: {
+    marginBottom: theme.spacing.sm,
+    padding: theme.spacing.md,
+  },
+  testCardInner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  testInfo: {
+    flex: 1,
+  },
+  testCardName: {
+    ...theme.typography.title,
+    fontSize: 16,
+    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
+  },
+  testCardPrice: {
+    ...theme.typography.body,
+    color: theme.colors.primary,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    padding: 8,
+  }
 });

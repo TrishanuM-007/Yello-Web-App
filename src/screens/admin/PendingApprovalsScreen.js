@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, RefreshControl, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../context/ThemeContext';
 import ClayCard from '../../components/ClayCard';
 import ClayButton from '../../components/ClayButton';
@@ -10,16 +11,27 @@ export default function PendingApprovalsScreen() {
   const { theme, isDarkMode } = useTheme();
   const styles = getStyles(theme, isDarkMode);
 
-  const [pendingSlots, setPendingSlots] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [confirmingId, setConfirmingId] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'tests'
 
+  // Appointments State
+  const [pendingSlots, setPendingSlots] = useState([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [confirmingId, setConfirmingId] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [activeRequest, setActiveRequest] = useState(null);
   const [fetchedSlots, setFetchedSlots] = useState([]);
   const [fetchingSlots, setFetchingSlots] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState([]);
+
+  // Lab Tests State
+  const [pendingTests, setPendingTests] = useState([]);
+  const [loadingTests, setLoadingTests] = useState(true);
+  const [confirmingTestId, setConfirmingTestId] = useState(null);
+  const [testTimePickerVisible, setTestTimePickerVisible] = useState(false);
+  const [selectedTestTime, setSelectedTestTime] = useState(new Date());
+  const [activeTestRequest, setActiveTestRequest] = useState(null);
+
+  const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -28,6 +40,9 @@ export default function PendingApprovalsScreen() {
     }, 1200);
   };
 
+  // ------------------------------------------
+  // APPOINTMENTS LOGIC
+  // ------------------------------------------
   useEffect(() => {
     const q = query(collection(db, 'booking_requests'), where('status', '==', 'pending'));
     
@@ -66,20 +81,16 @@ export default function PendingApprovalsScreen() {
           };
         }));
         
-        // sort by timestamp descending (newest first)
-        slotsWithDetails.sort((a, b) => {
-          return new Date(b.timestamp) - new Date(a.timestamp);
-        });
-
+        slotsWithDetails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         setPendingSlots(slotsWithDetails);
-        setLoading(false);
+        setLoadingAppointments(false);
       } catch (error) {
         console.error("Error populating pending slots:", error);
-        setLoading(false);
+        setLoadingAppointments(false);
       }
     }, (error) => {
       console.error("Error fetching pending slots:", error);
-      setLoading(false);
+      setLoadingAppointments(false);
     });
 
     return () => unsubscribe();
@@ -101,7 +112,6 @@ export default function PendingApprovalsScreen() {
       const snapshot = await getDocs(q);
       const slotsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Sort by date, then time
       slotsList.sort((a, b) => {
         if (a.date === b.date) {
           return a.time.localeCompare(b.time);
@@ -140,7 +150,8 @@ export default function PendingApprovalsScreen() {
         const slotRef = doc(db, 'available_slots', slot.id);
         await updateDoc(slotRef, {
           isBooked: true,
-          patientId: activeRequest.patientId
+          patientId: activeRequest.patientId,
+          status: 'confirmed'
         });
       }
       
@@ -163,7 +174,84 @@ export default function PendingApprovalsScreen() {
     }
   };
 
-  const renderItem = ({ item }) => (
+  // ------------------------------------------
+  // LAB TESTS LOGIC
+  // ------------------------------------------
+  useEffect(() => {
+    const q = query(collection(db, 'test_requests'), where('status', '==', 'pending'));
+    
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      try {
+        const testsWithDetails = await Promise.all(snapshot.docs.map(async (docSnap) => {
+          const testData = docSnap.data();
+          let patientName = 'Unknown Patient';
+          let patientPhone = 'N/A';
+
+          if (testData.patientId) {
+            const pRef = doc(db, 'patients', testData.patientId);
+            const pSnap = await getDoc(pRef);
+            if (pSnap.exists()) {
+              patientName = pSnap.data().name || 'Unknown Patient';
+              patientPhone = pSnap.data().phoneNumber || 'N/A';
+            }
+          }
+
+          return {
+            id: docSnap.id,
+            ...testData,
+            patientName,
+            patientPhone
+          };
+        }));
+        
+        testsWithDetails.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setPendingTests(testsWithDetails);
+        setLoadingTests(false);
+      } catch (error) {
+        console.error("Error populating pending tests:", error);
+        setLoadingTests(false);
+      }
+    }, (error) => {
+      console.error("Error fetching pending tests:", error);
+      setLoadingTests(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const openTestTimePicker = (testRequest) => {
+    setActiveTestRequest(testRequest);
+    setSelectedTestTime(new Date());
+    setTestTimePickerVisible(true);
+  };
+
+  const onTestTimeChange = async (event, selectedTime) => {
+    setTestTimePickerVisible(false);
+    if (!selectedTime || !activeTestRequest) return;
+    
+    setConfirmingTestId(activeTestRequest.id);
+    try {
+      const formattedTime = selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const reqRef = doc(db, 'test_requests', activeTestRequest.id);
+      await updateDoc(reqRef, {
+        status: 'confirmed',
+        requestedTime: formattedTime,
+        confirmedAt: new Date().toISOString()
+      });
+      Alert.alert('Success', `Test booking confirmed at ${formattedTime}!`);
+    } catch (error) {
+      console.error('Error confirming test booking:', error);
+      Alert.alert('Error', 'Failed to confirm booking.');
+    } finally {
+      setConfirmingTestId(null);
+      setActiveTestRequest(null);
+    }
+  };
+
+  // ------------------------------------------
+  // RENDER HELPERS
+  // ------------------------------------------
+  const renderAppointmentItem = ({ item }) => (
     <ClayCard style={styles.card}>
       <Text style={styles.cardTitle}>Dr. {item.doctorName}</Text>
       <View style={styles.detailsRow}>
@@ -189,28 +277,106 @@ export default function PendingApprovalsScreen() {
     </ClayCard>
   );
 
-  return (
-    <View style={styles.container}>
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      ) : pendingSlots.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No pending requests.</Text>
-        </View>
-      ) : (
+  const renderTestItem = ({ item }) => (
+    <ClayCard style={styles.card}>
+      <Text style={styles.cardTitle}>{item.testName}</Text>
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailLabel}>Requested Time:</Text>
+        <Text style={styles.detailValue}>{item.requestedDate} at {item.requestedTime}</Text>
+      </View>
+      <View style={styles.divider} />
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailLabel}>Patient:</Text>
+        <Text style={styles.detailValue}>{item.patientName}</Text>
+      </View>
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailLabel}>Phone:</Text>
+        <Text style={styles.detailValue}>{item.patientPhone}</Text>
+      </View>
+      
+      <ClayButton 
+        title="Confirm Booking"
+        onPress={() => openTestTimePicker(item)}
+        loading={confirmingTestId === item.id}
+        style={styles.confirmButton}
+      />
+    </ClayCard>
+  );
+
+  const renderContent = () => {
+    if (activeTab === 'appointments') {
+      if (loadingAppointments) {
+        return (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        );
+      }
+      if (pendingSlots.length === 0) {
+        return (
+          <View style={styles.centerContainer}>
+            <Text style={styles.emptyText}>No pending appointment requests.</Text>
+          </View>
+        );
+      }
+      return (
         <FlatList
           data={pendingSlots}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderItem={renderAppointmentItem}
           contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />}
         />
-      )}
+      );
+    } else {
+      if (loadingTests) {
+        return (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        );
+      }
+      if (pendingTests.length === 0) {
+        return (
+          <View style={styles.centerContainer}>
+            <Text style={styles.emptyText}>No pending test requests.</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          data={pendingTests}
+          keyExtractor={(item) => item.id}
+          renderItem={renderTestItem}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />}
+        />
+      );
+    }
+  };
 
+  return (
+    <View style={styles.container}>
+      {/* Top Tab UI */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'appointments' && styles.activeTab]}
+          onPress={() => setActiveTab('appointments')}
+        >
+          <Text style={[styles.tabText, activeTab === 'appointments' && styles.activeTabText]}>Appointments</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'tests' && styles.activeTab]}
+          onPress={() => setActiveTab('tests')}
+        >
+          <Text style={[styles.tabText, activeTab === 'tests' && styles.activeTabText]}>Lab Tests</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content */}
+      {renderContent()}
+
+      {/* Appointment Assign Modal */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -227,16 +393,10 @@ export default function PendingApprovalsScreen() {
                   return (
                     <TouchableOpacity 
                       key={slot.id} 
-                      style={[
-                        styles.slotChip, 
-                        isSelected && styles.slotChipSelected
-                      ]}
+                      style={[styles.slotChip, isSelected && styles.slotChipSelected]}
                       onPress={() => toggleSlotSelection(slot)}
                     >
-                      <Text style={[
-                        styles.slotChipText,
-                        isSelected && styles.slotChipTextSelected
-                      ]}>
+                      <Text style={[styles.slotChipText, isSelected && styles.slotChipTextSelected]}>
                         {slot.date}
                         {'\n'}
                         {slot.time}
@@ -262,6 +422,16 @@ export default function PendingApprovalsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Test Time Assign Picker */}
+      {testTimePickerVisible && (
+        <DateTimePicker
+          value={selectedTestTime}
+          mode="time"
+          display="default"
+          onChange={onTestTimeChange}
+        />
+      )}
     </View>
   );
 }
@@ -272,6 +442,33 @@ const getStyles = (theme, isDarkMode) => StyleSheet.create({
     backgroundColor: theme.colors.background,
     padding: theme.spacing.lg,
   },
+  // Tab UI Styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: isDarkMode ? '#1A1A1A' : '#EEEEEE',
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.xl,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.borderRadius.md - 4,
+  },
+  activeTab: {
+    backgroundColor: theme.colors.primary,
+  },
+  tabText: {
+    ...theme.typography.title,
+    fontSize: 14,
+    color: isDarkMode ? '#AAAAAA' : theme.colors.textLight,
+  },
+  activeTabText: {
+    color: '#1A1A1A',
+  },
+  // Rest of original styles...
   listContainer: {
     paddingBottom: theme.spacing.xl,
   },
@@ -293,7 +490,7 @@ const getStyles = (theme, isDarkMode) => StyleSheet.create({
     ...theme.typography.body,
     fontWeight: '600',
     color: isDarkMode ? '#CCCCCC' : theme.colors.textLight,
-    width: 100,
+    width: 130, // Slightly widened to accommodate "Requested Time"
   },
   detailValue: {
     ...theme.typography.body,

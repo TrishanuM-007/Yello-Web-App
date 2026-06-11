@@ -59,19 +59,17 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
   }, [doctor]);
 
   const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
+    setShowDatePicker(false);
+    if (selectedDate) setDate(selectedDate);
   };
 
   const onStartChange = (event, selectedDate) => {
-    if (Platform.OS === 'android') setShowStartPicker(false);
+    setShowStartPicker(false);
     if (selectedDate) setShiftStart(selectedDate);
   };
 
   const onEndChange = (event, selectedDate) => {
-    if (Platform.OS === 'android') setShowEndPicker(false);
+    setShowEndPicker(false);
     if (selectedDate) setShiftEnd(selectedDate);
   };
 
@@ -221,99 +219,54 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
           <Text style={styles.sectionTitle}>Add New Slots</Text>
           
           <Text style={styles.label}>Select Date</Text>
-          {Platform.OS === 'ios' ? (
+          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.pickerButton, { width: '100%' }]}>
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.textLight} />
+            <Text style={styles.pickerButtonText}>{date.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
             <DateTimePicker
               value={date}
               mode="date"
               display="default"
               onChange={onDateChange}
-              style={{ alignSelf: 'flex-start', marginBottom: 16 }}
             />
-          ) : (
-            <>
-              <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
-                <Text style={styles.datePickerText}>{date.toISOString().split('T')[0]}</Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="default"
-                  onChange={onDateChange}
-                />
-              )}
-            </>
           )}
 
           <Text style={styles.sectionHeader}>Define Shift Time</Text>
           <View style={styles.shiftContainer}>
             <View style={styles.pickerColumn}>
               <Text style={styles.pickerLabel}>Shift Start Time</Text>
-              {Platform.OS === 'ios' ? (
-                <View style={styles.timePickerWrapper}>
-                  <DateTimePicker
-                    value={shiftStart}
-                    mode="time"
-                    display="spinner"
-                    textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-                    onChange={onStartChange}
-                    style={styles.timePicker}
-                  />
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity 
-                    style={styles.timeButton}
-                    onPress={() => setShowStartPicker(true)}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      {shiftStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                  {showStartPicker && (
-                    <DateTimePicker
-                      value={shiftStart}
-                      mode="time"
-                      display="spinner"
-                      onChange={onStartChange}
-                    />
-                  )}
-                </>
+              <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.pickerButton}>
+                <Ionicons name="time-outline" size={20} color={theme.colors.textLight} />
+                <Text style={styles.pickerButtonText}>
+                  {shiftStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={shiftStart}
+                  mode="time"
+                  display="default"
+                  onChange={onStartChange}
+                />
               )}
             </View>
 
             <View style={styles.pickerColumn}>
               <Text style={styles.pickerLabel}>Shift End Time</Text>
-              {Platform.OS === 'ios' ? (
-                <View style={styles.timePickerWrapper}>
-                  <DateTimePicker
-                    value={shiftEnd}
-                    mode="time"
-                    display="spinner"
-                    textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-                    onChange={onEndChange}
-                    style={styles.timePicker}
-                  />
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity 
-                    style={styles.timeButton}
-                    onPress={() => setShowEndPicker(true)}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      {shiftEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                  {showEndPicker && (
-                    <DateTimePicker
-                      value={shiftEnd}
-                      mode="time"
-                      display="spinner"
-                      onChange={onEndChange}
-                    />
-                  )}
-                </>
+              <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.pickerButton}>
+                <Ionicons name="time-outline" size={20} color={theme.colors.textLight} />
+                <Text style={styles.pickerButtonText}>
+                  {shiftEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+              {showEndPicker && (
+                <DateTimePicker
+                  value={shiftEnd}
+                  mode="time"
+                  display="default"
+                  onChange={onEndChange}
+                />
               )}
             </View>
           </View>
@@ -433,16 +386,20 @@ const getStyles = (theme, isDarkMode) => StyleSheet.create({
     marginBottom: theme.spacing.xs,
     marginTop: theme.spacing.sm,
   },
-  datePickerButton: {
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.md,
-    backgroundColor: theme.colors.background,
+    backgroundColor: isDarkMode ? '#2A2A2A' : '#F9F9F9',
     marginBottom: theme.spacing.sm,
+    width: '95%',
   },
-  datePickerText: {
-    fontSize: theme.typography.body.fontSize,
+  pickerButtonText: {
+    ...theme.typography.body,
+    marginLeft: theme.spacing.sm,
     color: isDarkMode ? '#FFFFFF' : theme.colors.text,
   },
   sectionHeader: {
@@ -467,36 +424,6 @@ const getStyles = (theme, isDarkMode) => StyleSheet.create({
     fontWeight: '600',
     color: isDarkMode ? '#CCCCCC' : theme.colors.textLight,
     marginBottom: 8,
-  },
-  timePickerWrapper: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    overflow: 'hidden',
-    width: '95%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  timePicker: {
-    width: '100%',
-    height: 120,
-  },
-  timeButton: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.background,
-    width: '95%',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  timeButtonText: {
-    fontSize: theme.typography.body.fontSize,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    fontWeight: '600',
   },
   previewButton: {
     marginTop: theme.spacing.md,

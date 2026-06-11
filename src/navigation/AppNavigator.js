@@ -20,6 +20,7 @@ import TestReportsScreen from '../screens/TestReportsScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import PatientSettingsScreen from '../screens/PatientSettingsScreen';
 import HealthPackagesScreen from '../screens/HealthPackagesScreen';
+import AIDoctorScreen from '../screens/AIChatbot/AIDoctorChatBot';
 
 const Drawer = createDrawerNavigator();
 const Stack = createNativeStackNavigator();
@@ -70,6 +71,7 @@ function DrawerNavigator() {
       <Drawer.Screen name="BookTest" component={BookTestScreen} options={{ title: 'Book Test' }} />
       <Drawer.Screen name="HealthPackages" component={HealthPackagesScreen} options={{ title: 'Health Packages' }} />
       <Drawer.Screen name="TestReports" component={TestReportsScreen} options={{ title: 'Test Reports' }} />
+      <Drawer.Screen name="AIDoctor" component={AIDoctorScreen} options={{ title: 'AI Doctor Chat' }} />
       <Drawer.Screen name="Settings" component={PatientSettingsScreen} options={{ title: 'Settings' }} />
       <Drawer.Screen name="ContactUs" component={ContactUsScreen} options={{ title: 'Contact Us' }} />
     </Drawer.Navigator>
