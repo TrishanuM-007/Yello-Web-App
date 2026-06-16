@@ -5,8 +5,8 @@ import ClayButton from '../../components/ClayButton';
 import ClayCard from '../../components/ClayCard';
 import { db } from '../../config/firebase';
 import { collection, addDoc, getDocs, query } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 import { Picker } from '@react-native-picker/picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function ManageDoctorSlotsScreen() {
   const { theme, isDarkMode } = useTheme();
@@ -15,16 +15,9 @@ export default function ManageDoctorSlotsScreen() {
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   
-  const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  
-  const defaultStart = new Date();
-  defaultStart.setHours(9, 0, 0, 0);
-  const defaultEnd = new Date();
-  defaultEnd.setHours(17, 0, 0, 0);
-
-  const [shiftStart, setShiftStart] = useState(defaultStart);
-  const [shiftEnd, setShiftEnd] = useState(defaultEnd);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shiftStart, setShiftStart] = useState('09:00');
+  const [shiftEnd, setShiftEnd] = useState('17:00');
   
   const [generatedSlots, setGeneratedSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,20 +38,23 @@ export default function ManageDoctorSlotsScreen() {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to fetch doctors.');
+      window.alert('Error: Failed to fetch doctors.');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePreview = () => {
-    if (shiftEnd <= shiftStart) {
-      Alert.alert('Invalid Time', 'Shift end must be after shift start.');
+    const startDateTime = new Date(`${date}T${shiftStart}:00`);
+    const endDateTime = new Date(`${date}T${shiftEnd}:00`);
+
+    if (endDateTime <= startDateTime) {
+      window.alert('Invalid Time: Shift end must be after shift start.');
       return;
     }
     const slots = [];
-    let current = new Date(shiftStart);
-    while (current < shiftEnd) {
+    let current = startDateTime;
+    while (current < endDateTime) {
       slots.push(new Date(current));
       current.setMinutes(current.getMinutes() + 15);
     }
@@ -67,11 +63,11 @@ export default function ManageDoctorSlotsScreen() {
 
   const handlePublish = async () => {
     if (generatedSlots.length === 0) {
-      Alert.alert('Error', 'Please preview slots before publishing.');
+      window.alert('Error: Please preview slots before publishing.');
       return;
     }
     if (!selectedDoctorId) {
-      Alert.alert('Error', 'Please select a doctor.');
+      window.alert('Error: Please select a doctor.');
       return;
     }
 
@@ -81,7 +77,7 @@ export default function ManageDoctorSlotsScreen() {
     setPublishing(true);
     try {
       const slotsRef = collection(db, 'available_slots');
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = date;
 
       for (const slot of generatedSlots) {
         const startStr = slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
@@ -99,11 +95,11 @@ export default function ManageDoctorSlotsScreen() {
         });
       }
 
-      Alert.alert('Success', `${generatedSlots.length} slots published successfully!`);
+      window.alert(`Success: ${generatedSlots.length} slots published successfully!`);
       setGeneratedSlots([]);
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to publish slots.');
+      window.alert('Error: Failed to publish slots.');
     } finally {
       setPublishing(false);
     }
@@ -140,66 +136,58 @@ export default function ManageDoctorSlotsScreen() {
           </View>
 
           <Text style={styles.label}>Date</Text>
-          {Platform.OS === 'ios' ? (
-            <View style={styles.iosDatePickerContainer}>
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) setDate(selectedDate);
+          <View style={{ marginBottom: theme.spacing.sm }}>
+            <input 
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                border: '1px solid #CCCCCC',
+                width: '100%',
+                fontSize: 16,
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A'
+              }}
+            />
+          </View>
+
+          <Text style={styles.sectionHeader}>Define Shift Time</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.lg }}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={styles.pickerLabel}>Shift Start</Text>
+              <input 
+                type="time"
+                value={shiftStart}
+                onChange={(e) => setShiftStart(e.target.value)}
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  border: '1px solid #CCCCCC',
+                  width: '90%',
+                  fontSize: 16,
+                  backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A'
                 }}
               />
             </View>
-          ) : (
-            <>
-              <TouchableOpacity 
-                style={styles.dateButton} 
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{date.toLocaleDateString()}</Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(false);
-                    if (selectedDate) setDate(selectedDate);
-                  }}
-                />
-              )}
-            </>
-          )}
-
-          <Text style={styles.sectionHeader}>Define Shift Time</Text>
-          <View style={styles.shiftContainer}>
-            <View style={styles.pickerColumn}>
-              <Text style={styles.pickerLabel}>Shift Start</Text>
-              <View style={styles.timePickerWrapper}>
-                <DateTimePicker
-                  value={shiftStart}
-                  mode="time"
-                  display="spinner"
-                  textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-                  onChange={(e, d) => d && setShiftStart(d)}
-                  style={styles.timePicker}
-                />
-              </View>
-            </View>
-            <View style={styles.pickerColumn}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
               <Text style={styles.pickerLabel}>Shift End</Text>
-              <View style={styles.timePickerWrapper}>
-                <DateTimePicker
-                  value={shiftEnd}
-                  mode="time"
-                  display="spinner"
-                  textColor={isDarkMode ? '#FFFFFF' : '#000000'}
-                  onChange={(e, d) => d && setShiftEnd(d)}
-                  style={styles.timePicker}
-                />
-              </View>
+              <input 
+                type="time"
+                value={shiftEnd}
+                onChange={(e) => setShiftEnd(e.target.value)}
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  border: '1px solid #CCCCCC',
+                  width: '90%',
+                  fontSize: 16,
+                  backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A'
+                }}
+              />
             </View>
           </View>
 

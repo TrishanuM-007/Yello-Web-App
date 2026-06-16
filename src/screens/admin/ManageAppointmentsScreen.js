@@ -34,7 +34,7 @@ export default function ManageAppointmentsScreen({ navigation }) {
       setLoading(false);
     }, (error) => {
       console.error("Error fetching doctors: ", error);
-      Alert.alert('Error', 'Failed to fetch doctors list. Please check your connection.');
+      window.alert('Error: Failed to fetch doctors list. Please check your connection.');
       setLoading(false);
     });
 

@@ -6,7 +6,6 @@ import ClayButton from '../../components/ClayButton';
 import { db } from '../../config/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
-import { sendPushNotification } from '../../utils/NotificationSetup';
 
 export default function OngoingServicesScreen() {
   const { theme, isDarkMode } = useTheme();
@@ -153,7 +152,7 @@ export default function OngoingServicesScreen() {
     return () => unsubscribe();
   }, []);
 
-  const markAsDone = async (id, collectionName, patientId) => {
+  const handleCheckout = async (id, collectionName, patientId) => {
     setProcessingId(id);
     try {
       const docRef = doc(db, collectionName, id);
@@ -161,31 +160,11 @@ export default function OngoingServicesScreen() {
         status: 'completed',
         completedAt: new Date().toISOString()
       });
-      showToast('Service marked as completed!');
+      showToast('Checkout successful!');
 
-      // Fetch patient's push token and send notification
+      // WhatsApp notification placeholder
       if (patientId) {
-        try {
-          const pRef = doc(db, 'patients', patientId);
-          const pSnap = await getDoc(pRef);
-          if (pSnap.exists()) {
-            const pushToken = pSnap.data().expoPushToken;
-            if (pushToken) {
-              let title = '';
-              let body = '';
-              if (collectionName === 'available_slots') {
-                title = 'How was your visit?';
-                body = 'Your appointment is complete. Please leave us some feedback!';
-              } else if (collectionName === 'test_requests') {
-                title = 'Test Complete';
-                body = 'Your test is done. We will notify you when results are ready!';
-              }
-              await sendPushNotification(pushToken, title, body);
-            }
-          }
-        } catch (notifError) {
-          console.error('Failed to send push notification:', notifError);
-        }
+        console.log('Would send WhatsApp alert to patient here');
       }
     } catch (error) {
       console.error('Error marking service as done:', error);
@@ -213,8 +192,8 @@ export default function OngoingServicesScreen() {
       </View>
       
       <ClayButton 
-        title="Mark as Done"
-        onPress={() => markAsDone(item.id, 'available_slots', item.patientId)}
+        title="Checkout"
+        onPress={() => handleCheckout(item.id, 'available_slots', item.patientId)}
         loading={processingId === item.id}
         style={styles.doneButton}
       />
@@ -239,8 +218,8 @@ export default function OngoingServicesScreen() {
       </View>
       
       <ClayButton 
-        title="Mark as Done"
-        onPress={() => markAsDone(item.id, 'test_requests', item.patientId)}
+        title="Checkout"
+        onPress={() => handleCheckout(item.id, 'test_requests', item.patientId)}
         loading={processingId === item.id}
         style={styles.doneButton}
       />

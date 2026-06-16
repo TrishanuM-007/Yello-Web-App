@@ -13,7 +13,7 @@ export default function AdminLoginScreen({ navigation }) {
     if (passcode === 'admin123') {
       navigation.navigate('AdminDashboard');
     } else {
-      Alert.alert('Access Denied', 'Incorrect passcode. Please try again.');
+      window.alert('Access Denied: Incorrect passcode. Please try again.');
     }
   };
 
@@ -32,6 +32,8 @@ export default function AdminLoginScreen({ navigation }) {
             secureTextEntry
             value={passcode}
             onChangeText={setPasscode}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
         </View>
 

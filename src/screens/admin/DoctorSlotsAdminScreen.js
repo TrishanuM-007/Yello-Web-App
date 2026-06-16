@@ -5,7 +5,6 @@ import ClayButton from '../../components/ClayButton';
 import ClayCard from '../../components/ClayCard';
 import { db } from '../../config/firebase';
 import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function DoctorSlotsAdminScreen({ route, navigation }) {
@@ -13,23 +12,18 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
   const { theme, isDarkMode } = useTheme();
   const styles = getStyles(theme, isDarkMode);
 
-  const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  
-  const defaultStart = new Date();
-  defaultStart.setHours(9, 0, 0, 0);
-  const defaultEnd = new Date();
-  defaultEnd.setHours(17, 0, 0, 0);
-
-  const [shiftStart, setShiftStart] = useState(defaultStart);
-  const [shiftEnd, setShiftEnd] = useState(defaultEnd);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shiftStart, setShiftStart] = useState('09:00');
+  const [shiftEnd, setShiftEnd] = useState('17:00');
   const [generatedSlots, setGeneratedSlots] = useState([]);
   
   const [addingSlot, setAddingSlot] = useState(false);
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
+
+  // Batch Deletion State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedSlotIds, setSelectedSlotIds] = useState([]);
 
   useEffect(() => {
     if (!doctor || !doctor.id) return;
@@ -51,36 +45,24 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
       setLoadingSlots(false);
     }, (error) => {
       console.error("Error fetching slots: ", error);
-      Alert.alert('Error', 'Failed to fetch existing slots.');
+      window.alert('Error: Failed to fetch existing slots.');
       setLoadingSlots(false);
     });
 
     return () => unsubscribe();
   }, [doctor]);
 
-  const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) setDate(selectedDate);
-  };
-
-  const onStartChange = (event, selectedDate) => {
-    setShowStartPicker(false);
-    if (selectedDate) setShiftStart(selectedDate);
-  };
-
-  const onEndChange = (event, selectedDate) => {
-    setShowEndPicker(false);
-    if (selectedDate) setShiftEnd(selectedDate);
-  };
-
   const handlePreviewSlots = () => {
-    if (shiftEnd <= shiftStart) {
-      Alert.alert('Invalid Time', 'Shift end must be after shift start.');
+    const startDateTime = new Date(`${date}T${shiftStart}:00`);
+    const endDateTime = new Date(`${date}T${shiftEnd}:00`);
+
+    if (endDateTime <= startDateTime) {
+      window.alert('Invalid Time: Shift end must be after shift start.');
       return;
     }
     const tempSlots = [];
-    let current = new Date(shiftStart);
-    while (current < shiftEnd) {
+    let current = startDateTime;
+    while (current < endDateTime) {
       tempSlots.push(new Date(current));
       current.setMinutes(current.getMinutes() + 15);
     }
@@ -89,13 +71,13 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
 
   const handleAddSlots = async () => {
     if (generatedSlots.length === 0) {
-      Alert.alert('Error', 'Please generate slots before publishing.');
+      window.alert('Error: Please generate slots before publishing.');
       return;
     }
 
     setAddingSlot(true);
     try {
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = date;
 
       for (const slot of generatedSlots) {
         const startStr = slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
@@ -114,85 +96,99 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
         await addDoc(collection(db, 'available_slots'), slotData);
       }
 
-      Alert.alert('Success', `${generatedSlots.length} slots added successfully!`);
+      window.alert(`Success: ${generatedSlots.length} slots added successfully!`);
       setGeneratedSlots([]);
     } catch (error) {
       console.error('Error adding slots:', error);
-      Alert.alert('Error', 'Failed to add slots. Please try again.');
+      window.alert('Error: Failed to add slots. Please try again.');
     } finally {
       setAddingSlot(false);
     }
   };
 
   const handleDeleteDoctor = () => {
-    Alert.alert(
-      'Delete Doctor',
-      `Are you sure you want to delete ${doctor.name}? This will also delete all their slots.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const slotsQuery = query(collection(db, 'available_slots'), where('doctorId', '==', doctor.id));
-              const slotsSnapshot = await getDocs(slotsQuery);
-              const batchPromises = slotsSnapshot.docs.map(slotDoc => deleteDoc(doc(db, 'available_slots', slotDoc.id)));
-              await Promise.all(batchPromises);
+    if (window.confirm(`Delete Doctor: Are you sure you want to delete ${doctor.name}? This will also delete all their slots.`)) {
+      (async () => {
+        try {
+          const slotsQuery = query(collection(db, 'available_slots'), where('doctorId', '==', doctor.id));
+          const slotsSnapshot = await getDocs(slotsQuery);
+          const batchPromises = slotsSnapshot.docs.map(slotDoc => deleteDoc(doc(db, 'available_slots', slotDoc.id)));
+          await Promise.all(batchPromises);
 
-              await deleteDoc(doc(db, 'doctors', doctor.id));
+          await deleteDoc(doc(db, 'doctors', doctor.id));
 
-              Alert.alert('Success', 'Doctor deleted successfully.');
-              navigation.goBack();
-            } catch (error) {
-              console.error('Error deleting doctor:', error);
-              Alert.alert('Error', 'Failed to delete doctor.');
-            }
-          }
+          window.alert('Success: Doctor deleted successfully.');
+          navigation.goBack();
+        } catch (error) {
+          console.error('Error deleting doctor:', error);
+          window.alert('Error: Failed to delete doctor.');
         }
-      ]
-    );
+      })();
+    }
   };
 
-  const handleDeleteSlot = (slot) => {
-    Alert.alert(
-      'Delete Slot',
-      `Are you sure you want to delete the slot at ${slot.time}?${slot.isBooked ? '\n\nWARNING: This slot is currently booked!' : ''}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, 'available_slots', slot.id));
-              // Since we are using onSnapshot, the list will update automatically
-            } catch (error) {
-              console.error('Error deleting slot:', error);
-              Alert.alert('Error', 'Failed to delete slot.');
-            }
-          }
-        }
-      ]
-    );
+  const handleBatchDeleteSlots = async () => {
+    if (selectedSlotIds.length === 0) return;
+
+    const bookedSelected = slots.filter(s => selectedSlotIds.includes(s.id) && s.isBooked);
+    let warningMsg = `Are you sure you want to delete ${selectedSlotIds.length} slot(s)?`;
+    if (bookedSelected.length > 0) {
+      warningMsg += `\n\nWARNING: ${bookedSelected.length} of these slots are currently BOOKED!`;
+    }
+
+    if (window.confirm(warningMsg)) {
+      setLoadingSlots(true);
+      try {
+        const batchPromises = selectedSlotIds.map(id => deleteDoc(doc(db, 'available_slots', id)));
+        await Promise.all(batchPromises);
+        window.alert('Success: Slots deleted successfully.');
+        setIsSelectionMode(false);
+        setSelectedSlotIds([]);
+      } catch (error) {
+        console.error('Error batch deleting slots:', error);
+        window.alert('Error: Failed to delete some slots.');
+      } finally {
+        setLoadingSlots(false);
+      }
+    }
   };
 
-  const renderSlotItem = (item) => (
-    <View key={item.id} style={styles.slotCard}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.slotDate}>{item.date}</Text>
-        <Text style={styles.slotTime}>{item.time}</Text>
-      </View>
-      <View style={styles.slotActions}>
-        <View style={[styles.statusBadge, { backgroundColor: item.isBooked ? theme.colors.error : theme.colors.success }]}>
-          <Text style={styles.statusText}>{item.isBooked ? 'Booked' : 'Available'}</Text>
+  const renderSlotItem = (item) => {
+    const isSelected = selectedSlotIds.includes(item.id);
+
+    const handleCardPress = () => {
+      if (!isSelectionMode) return;
+      if (isSelected) {
+        setSelectedSlotIds(prev => prev.filter(id => id !== item.id));
+      } else {
+        setSelectedSlotIds(prev => [...prev, item.id]);
+      }
+    };
+
+    return (
+      <TouchableOpacity key={item.id} onPress={handleCardPress} activeOpacity={isSelectionMode ? 0.7 : 1}>
+        <View style={[styles.slotCard, isSelected && { borderColor: theme.colors.primary, borderWidth: 2 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.slotDate}>{item.date}</Text>
+            <Text style={styles.slotTime}>{item.time}</Text>
+          </View>
+          <View style={styles.slotActions}>
+            <View style={[styles.statusBadge, { backgroundColor: item.isBooked ? theme.colors.error : theme.colors.success }]}>
+              <Text style={styles.statusText}>{item.isBooked ? 'Booked' : 'Available'}</Text>
+            </View>
+            {isSelectionMode && (
+              <Ionicons 
+                name={isSelected ? "checkbox" : "square-outline"} 
+                size={24} 
+                color={isSelected ? theme.colors.primary : theme.colors.textLight} 
+                style={{ marginLeft: 8 }}
+              />
+            )}
+          </View>
         </View>
-        <TouchableOpacity onPress={() => handleDeleteSlot(item)} style={styles.slotDeleteButton}>
-          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <KeyboardAvoidingView 
@@ -219,55 +215,59 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
           <Text style={styles.sectionTitle}>Add New Slots</Text>
           
           <Text style={styles.label}>Select Date</Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.pickerButton, { width: '100%' }]}>
-            <Ionicons name="calendar-outline" size={20} color={theme.colors.textLight} />
-            <Text style={styles.pickerButtonText}>{date.toLocaleDateString()}</Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
+          <View style={{ marginBottom: theme.spacing.sm }}>
+            <input 
+              type="date"
               value={date}
-              mode="date"
-              display="default"
-              onChange={onDateChange}
+              onChange={(e) => setDate(e.target.value)}
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                border: '1px solid #CCCCCC',
+                width: '100%',
+                fontSize: 16,
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A'
+              }}
             />
-          )}
+          </View>
 
           <Text style={styles.sectionHeader}>Define Shift Time</Text>
-          <View style={styles.shiftContainer}>
-            <View style={styles.pickerColumn}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.lg }}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
               <Text style={styles.pickerLabel}>Shift Start Time</Text>
-              <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.pickerButton}>
-                <Ionicons name="time-outline" size={20} color={theme.colors.textLight} />
-                <Text style={styles.pickerButtonText}>
-                  {shiftStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-              {showStartPicker && (
-                <DateTimePicker
-                  value={shiftStart}
-                  mode="time"
-                  display="default"
-                  onChange={onStartChange}
-                />
-              )}
+              <input 
+                type="time"
+                value={shiftStart}
+                onChange={(e) => setShiftStart(e.target.value)}
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  border: '1px solid #CCCCCC',
+                  width: '90%',
+                  fontSize: 16,
+                  backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A'
+                }}
+              />
             </View>
 
-            <View style={styles.pickerColumn}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
               <Text style={styles.pickerLabel}>Shift End Time</Text>
-              <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.pickerButton}>
-                <Ionicons name="time-outline" size={20} color={theme.colors.textLight} />
-                <Text style={styles.pickerButtonText}>
-                  {shiftEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-              {showEndPicker && (
-                <DateTimePicker
-                  value={shiftEnd}
-                  mode="time"
-                  display="default"
-                  onChange={onEndChange}
-                />
-              )}
+              <input 
+                type="time"
+                value={shiftEnd}
+                onChange={(e) => setShiftEnd(e.target.value)}
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  border: '1px solid #CCCCCC',
+                  width: '90%',
+                  fontSize: 16,
+                  backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A'
+                }}
+              />
             </View>
           </View>
 
@@ -301,7 +301,28 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
         </ClayCard>
 
         <View style={styles.slotsSection}>
-          <Text style={styles.sectionTitle}>Existing Slots</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Existing Slots</Text>
+            
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              {isSelectionMode && selectedSlotIds.length > 0 && (
+                <TouchableOpacity
+                  style={{ backgroundColor: '#FF3B30', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, justifyContent: 'center' }}
+                  onPress={handleBatchDeleteSlots}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Delete ({selectedSlotIds.length})</Text>
+                </TouchableOpacity>
+              )}
+              <ClayButton
+                title={isSelectionMode ? "Cancel Select" : "Select Slots"}
+                variant="secondary"
+                onPress={() => {
+                  setIsSelectionMode(!isSelectionMode);
+                  setSelectedSlotIds([]);
+                }}
+              />
+            </View>
+          </View>
           
           {loadingSlots ? (
             <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginTop: theme.spacing.md }} />

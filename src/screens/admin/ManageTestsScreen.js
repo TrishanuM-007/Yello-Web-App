@@ -30,7 +30,7 @@ export default function ManageTestsScreen() {
 
   const handleSubmit = async () => {
     if (!testName || !price) {
-      Alert.alert('Error', 'Please enter both test name and price.');
+      window.alert('Error: Please enter both test name and price.');
       return;
     }
 
@@ -43,33 +43,28 @@ export default function ManageTestsScreen() {
         createdAt: new Date().toISOString()
       });
 
-      Alert.alert('Success', 'Test added successfully!');
+      window.alert('Success: Test added successfully!');
       setTestName('');
       setPrice('');
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to add test. Please try again.');
+      window.alert('Error: Failed to add test. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Confirm Delete', 'Are you sure you want to completely remove this test? Patients will no longer see it.', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Delete', 
-        style: 'destructive', 
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, 'available_tests', id));
-          } catch (e) {
-            console.error(e);
-            Alert.alert('Error', 'Could not delete test');
-          }
+    if (window.confirm('Confirm Delete: Are you sure you want to completely remove this test? Patients will no longer see it.')) {
+      (async () => {
+        try {
+          await deleteDoc(doc(db, 'available_tests', id));
+        } catch (e) {
+          console.error(e);
+          window.alert('Error: Could not delete test');
         }
-      }
-    ]);
+      })();
+    }
   };
 
   return (
@@ -112,7 +107,7 @@ export default function ManageTestsScreen() {
         {fetching ? (
           <ActivityIndicator color={theme.colors.primary} />
         ) : tests.length === 0 ? (
-          <Text style={{color: theme.colors.textLight}}>No tests published yet.</Text>
+          <Text style={{ color: theme.colors.textLight }}>No tests published yet.</Text>
         ) : (
           tests.map(test => (
             <ClayCard key={test.id} style={styles.testCard}>
