@@ -160,7 +160,9 @@ export default function OngoingServicesScreen() {
   }, []);
 
   const handleCheckout = async (id, collectionName, patientId, patientPhone, patientName) => {
+    const whatsappTab = window.open('about:blank', '_blank');
     setProcessingId(id);
+    
     try {
       const docRef = doc(db, collectionName, id);
       await updateDoc(docRef, {
@@ -173,10 +175,16 @@ export default function OngoingServicesScreen() {
         let reviewMsg = messageSettings.feedbackTemplate || `Thank You for Visiting/Choosing YelloMedi [patient_name], please leave a review here: https://g.page/review/...`;
         reviewMsg = reviewMsg.replace(/\[patient_name\]/g, patientName || 'Patient')
                              .replace(/\[link\]/g, 'https://g.page/review/...');
-        sendWhatsAppMessage(patientPhone, reviewMsg);
+                             
+        const cleanPhone = patientPhone.replace(/\D/g, '');
+        const encodedMessage = encodeURIComponent(reviewMsg);
+        whatsappTab.location.href = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+      } else {
+        whatsappTab.close();
       }
     } catch (error) {
       console.error('Error marking service as done:', error);
+      whatsappTab.close();
       toast.error('Failed to update status.');
     } finally {
       setProcessingId(null);

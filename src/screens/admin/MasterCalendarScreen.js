@@ -310,6 +310,9 @@ export default function MasterCalendarScreen() {
       toast.error("Please select a patient.");
       return;
     }
+
+    const whatsappTab = window.open('about:blank', '_blank');
+
     const p = patients.find(pat => pat.id === selectedPatientId);
     try {
       const slotRef = doc(db, 'available_slots', slotToBook.id);
@@ -324,41 +327,58 @@ export default function MasterCalendarScreen() {
       
       // Task A: Notify Doctor on Booking
       const doctorPhone = activeDoctor?.phone || activeDoctor?.phoneNumber || activeDoctor?.contactNumber;
-      let docMsg = messageSettings.bookingTemplate || `A booking at [time] on [date] has been scheduled with [patient_name].`;
-      docMsg = docMsg.replace(/\[time\]/g, slotToBook.time)
-                     .replace(/\[date\]/g, slotToBook.date)
-                     .replace(/\[patient_name\]/g, p?.name || 'Unknown Patient');
-                     
-      sendWhatsAppMessage(doctorPhone, docMsg);
+      
+      if (!doctorPhone) {
+        whatsappTab.close();
+        toast.error("No valid phone number found for this doctor.");
+      } else {
+        let docMsg = messageSettings.bookingTemplate || `A booking at [time] on [date] has been scheduled with [patient_name].`;
+        docMsg = docMsg.replace(/\[time\]/g, slotToBook.time)
+                       .replace(/\[date\]/g, slotToBook.date)
+                       .replace(/\[patient_name\]/g, p?.name || 'Unknown Patient');
+                       
+        const cleanPhone = doctorPhone.replace(/\D/g, '');
+        const encodedMessage = encodeURIComponent(docMsg);
+        whatsappTab.location.href = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+      }
 
       setIsBookingModalOpen(false);
       setSlotToBook(null);
       toast.success('Booking Confirmed!');
     } catch (e) {
       console.error(e);
+      whatsappTab.close();
       toast.error("Failed to book.");
     }
   };
 
   const handleCheckout = async (slotId) => {
+    const whatsappTab = window.open('about:blank', '_blank');
+
     try {
       await updateDoc(doc(db, 'available_slots', slotId), {
         status: 'completed'
       });
       
       // Task B: Patient Checkout Review
-      if (selectedBookedSlot) {
+      if (selectedBookedSlot && selectedBookedSlot.patientPhone) {
         const pPhone = selectedBookedSlot.patientPhone;
         let reviewMsg = messageSettings.feedbackTemplate || `Thank You for Visiting/Choosing YelloMedi [patient_name], please leave a review here: https://g.page/review/...`;
         reviewMsg = reviewMsg.replace(/\[patient_name\]/g, selectedBookedSlot.patientName || 'Patient')
-                             .replace(/\[link\]/g, 'https://g.page/review/...'); // Placeholder for link if used
-        sendWhatsAppMessage(pPhone, reviewMsg);
+                             .replace(/\[link\]/g, 'https://g.page/review/...');
+        
+        const cleanPhone = pPhone.replace(/\D/g, '');
+        const encodedMessage = encodeURIComponent(reviewMsg);
+        whatsappTab.location.href = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+      } else {
+        whatsappTab.close();
       }
 
       setIsPatientSlideOutOpen(false);
       toast.success('Service marked as completed!');
     } catch (e) {
       console.error(e);
+      whatsappTab.close();
       toast.error("Failed to checkout.");
     }
   };
