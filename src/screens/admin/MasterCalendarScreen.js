@@ -56,6 +56,7 @@ export default function MasterCalendarScreen() {
   const [selectedPatientId, setSelectedPatientId] = useState(null);
 
   const gridRef = useRef(null);
+  const [messageSettings, setMessageSettings] = useState({});
 
   // Inject Tailwind CDN
   useEffect(() => {
@@ -91,6 +92,16 @@ export default function MasterCalendarScreen() {
     const unsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
       const pList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setPatients(pList);
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch Message Settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
+      if (docSnap.exists()) {
+        setMessageSettings(docSnap.data());
+      }
     });
     return () => unsub();
   }, []);
@@ -313,7 +324,11 @@ export default function MasterCalendarScreen() {
       
       // Task A: Notify Doctor on Booking
       const doctorPhone = activeDoctor?.phone || activeDoctor?.phoneNumber || activeDoctor?.contactNumber;
-      const docMsg = `A booking at ${slotToBook.time} on ${slotToBook.date} has been scheduled with ${p?.name || 'Unknown Patient'}.`;
+      let docMsg = messageSettings.bookingTemplate || `A booking at [time] on [date] has been scheduled with [patient_name].`;
+      docMsg = docMsg.replace(/\[time\]/g, slotToBook.time)
+                     .replace(/\[date\]/g, slotToBook.date)
+                     .replace(/\[patient_name\]/g, p?.name || 'Unknown Patient');
+                     
       sendWhatsAppMessage(doctorPhone, docMsg);
 
       setIsBookingModalOpen(false);
@@ -334,7 +349,9 @@ export default function MasterCalendarScreen() {
       // Task B: Patient Checkout Review
       if (selectedBookedSlot) {
         const pPhone = selectedBookedSlot.patientPhone;
-        const reviewMsg = `Thank You for Visiting/Choosing YelloMedi for your service, we would be happy if you could give us a review on this link: https://g.page/review/...`;
+        let reviewMsg = messageSettings.feedbackTemplate || `Thank You for Visiting/Choosing YelloMedi [patient_name], please leave a review here: https://g.page/review/...`;
+        reviewMsg = reviewMsg.replace(/\[patient_name\]/g, selectedBookedSlot.patientName || 'Patient')
+                             .replace(/\[link\]/g, 'https://g.page/review/...'); // Placeholder for link if used
         sendWhatsAppMessage(pPhone, reviewMsg);
       }
 

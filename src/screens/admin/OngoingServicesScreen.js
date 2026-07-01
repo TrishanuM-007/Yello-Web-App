@@ -27,6 +27,8 @@ export default function OngoingServicesScreen() {
   const [ongoingTests, setOngoingTests] = useState([]);
   const [loadingTests, setLoadingTests] = useState(true);
 
+  const [messageSettings, setMessageSettings] = useState({});
+
   const [processingId, setProcessingId] = useState(null);
 
 
@@ -38,6 +40,16 @@ export default function OngoingServicesScreen() {
       script.src = 'https://cdn.tailwindcss.com';
       document.head.appendChild(script);
     }
+  }, []);
+
+  // Fetch Message Settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
+      if (docSnap.exists()) {
+        setMessageSettings(docSnap.data());
+      }
+    });
+    return () => unsub();
   }, []);
 
   // Fetch Ongoing Appointments
@@ -147,7 +159,7 @@ export default function OngoingServicesScreen() {
     return () => unsubscribe();
   }, []);
 
-  const handleCheckout = async (id, collectionName, patientId, patientPhone) => {
+  const handleCheckout = async (id, collectionName, patientId, patientPhone, patientName) => {
     setProcessingId(id);
     try {
       const docRef = doc(db, collectionName, id);
@@ -158,7 +170,9 @@ export default function OngoingServicesScreen() {
       toast.success('Service marked as completed!');
 
       if (patientPhone) {
-        const reviewMsg = `Thank You for Visiting/Choosing YelloMedi for your service, we would be happy if you could give us a review on this link: https://g.page/review/...`;
+        let reviewMsg = messageSettings.feedbackTemplate || `Thank You for Visiting/Choosing YelloMedi [patient_name], please leave a review here: https://g.page/review/...`;
+        reviewMsg = reviewMsg.replace(/\[patient_name\]/g, patientName || 'Patient')
+                             .replace(/\[link\]/g, 'https://g.page/review/...');
         sendWhatsAppMessage(patientPhone, reviewMsg);
       }
     } catch (error) {
@@ -262,7 +276,7 @@ export default function OngoingServicesScreen() {
                   <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
                     <button
                       disabled={processingId === item.id}
-                      onClick={() => handleCheckout(item.id, 'available_slots', item.patientId, item.patientPhone)}
+                      onClick={() => handleCheckout(item.id, 'available_slots', item.patientId, item.patientPhone, item.patientName)}
                       className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${
                         processingId === item.id 
                           ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
@@ -328,7 +342,7 @@ export default function OngoingServicesScreen() {
                   <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
                     <button
                       disabled={processingId === item.id}
-                      onClick={() => handleCheckout(item.id, 'test_requests', item.patientId, item.patientPhone)}
+                      onClick={() => handleCheckout(item.id, 'test_requests', item.patientId, item.patientPhone, item.patientName)}
                       className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${
                         processingId === item.id 
                           ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
