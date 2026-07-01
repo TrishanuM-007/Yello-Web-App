@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import ClayCard from '../../components/ClayCard';
-import ClayButton from '../../components/ClayButton';
 import { db } from '../../config/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
+import { Menu, Activity, CalendarClock, CheckCircle, ChevronRight, Stethoscope } from 'lucide-react';
+import { Platform, View, Text } from 'react-native';
+import toast from 'react-hot-toast';
+
+const sendWhatsAppMessage = (phone, message) => {
+  if (!phone || phone === 'N/A') {
+    toast.error("No valid phone number found for this user.");
+    return;
+  }
+  const cleanPhone = phone.replace(/\D/g, ''); 
+  const encodedMessage = encodeURIComponent(message);
+  window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
+};
 
 export default function OngoingServicesScreen() {
-  const { theme, isDarkMode } = useTheme();
-  const styles = getStyles(theme, isDarkMode);
-
+  const { isDarkMode } = useTheme();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'tests'
   
   const [ongoingAppointments, setOngoingAppointments] = useState([]);
@@ -21,28 +29,16 @@ export default function OngoingServicesScreen() {
 
   const [processingId, setProcessingId] = useState(null);
 
-  // Toast State
-  const [toastVisible, setToastVisible] = useState(false);
-  const toastMessage = useRef('');
-  const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  const showToast = (message) => {
-    toastMessage.current = message;
-    setToastVisible(true);
-    Animated.timing(toastOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        Animated.timing(toastOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => setToastVisible(false));
-      }, 3000);
-    });
-  };
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && !document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+  }, []);
 
   // Fetch Ongoing Appointments
   useEffect(() => {
@@ -87,7 +83,6 @@ export default function OngoingServicesScreen() {
           };
         }));
         
-        // Sort by date then time
         slotsWithDetails.sort((a, b) => {
           if (a.date === b.date) {
             return a.time.localeCompare(b.time);
@@ -152,7 +147,7 @@ export default function OngoingServicesScreen() {
     return () => unsubscribe();
   }, []);
 
-  const handleCheckout = async (id, collectionName, patientId) => {
+  const handleCheckout = async (id, collectionName, patientId, patientPhone) => {
     setProcessingId(id);
     try {
       const docRef = doc(db, collectionName, id);
@@ -160,266 +155,205 @@ export default function OngoingServicesScreen() {
         status: 'completed',
         completedAt: new Date().toISOString()
       });
-      showToast('Checkout successful!');
+      toast.success('Service marked as completed!');
 
-      // WhatsApp notification placeholder
-      if (patientId) {
-        console.log('Would send WhatsApp alert to patient here');
+      if (patientPhone) {
+        const reviewMsg = `Thank You for Visiting/Choosing YelloMedi for your service, we would be happy if you could give us a review on this link: https://g.page/review/...`;
+        sendWhatsAppMessage(patientPhone, reviewMsg);
       }
     } catch (error) {
       console.error('Error marking service as done:', error);
-      alert('Failed to update status.');
+      toast.error('Failed to update status.');
     } finally {
       setProcessingId(null);
     }
   };
 
-  const renderAppointmentItem = ({ item }) => (
-    <ClayCard style={styles.card}>
-      <Text style={styles.cardTitle}>Dr. {item.doctorName}</Text>
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Schedule:</Text>
-        <Text style={styles.detailValue}>{item.date} at {item.time}</Text>
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>This highly styled component is optimized for Web only.</Text>
       </View>
-      <View style={styles.divider} />
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Patient:</Text>
-        <Text style={styles.detailValue}>{item.patientName}</Text>
-      </View>
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Phone:</Text>
-        <Text style={styles.detailValue}>{item.patientPhone}</Text>
-      </View>
-      
-      <ClayButton 
-        title="Checkout"
-        onPress={() => handleCheckout(item.id, 'available_slots', item.patientId)}
-        loading={processingId === item.id}
-        style={styles.doneButton}
-      />
-    </ClayCard>
-  );
-
-  const renderTestItem = ({ item }) => (
-    <ClayCard style={styles.card}>
-      <Text style={styles.cardTitle}>{item.testName}</Text>
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Schedule:</Text>
-        <Text style={styles.detailValue}>{item.requestedDate} at {item.requestedTime}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Patient:</Text>
-        <Text style={styles.detailValue}>{item.patientName}</Text>
-      </View>
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Phone:</Text>
-        <Text style={styles.detailValue}>{item.patientPhone}</Text>
-      </View>
-      
-      <ClayButton 
-        title="Checkout"
-        onPress={() => handleCheckout(item.id, 'test_requests', item.patientId)}
-        loading={processingId === item.id}
-        style={styles.doneButton}
-      />
-    </ClayCard>
-  );
-
-  const renderContent = () => {
-    if (activeTab === 'appointments') {
-      if (loadingAppointments) {
-        return (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        );
-      }
-      if (ongoingAppointments.length === 0) {
-        return (
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No ongoing appointments.</Text>
-          </View>
-        );
-      }
-      return (
-        <FlatList
-          data={ongoingAppointments}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAppointmentItem}
-          contentContainerStyle={styles.listContainer}
-        />
-      );
-    } else {
-      if (loadingTests) {
-        return (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        );
-      }
-      if (ongoingTests.length === 0) {
-        return (
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No ongoing lab tests.</Text>
-          </View>
-        );
-      }
-      return (
-        <FlatList
-          data={ongoingTests}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTestItem}
-          contentContainerStyle={styles.listContainer}
-        />
-      );
-    }
-  };
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Ongoing Services</Text>
-
-      {/* Top Tab UI */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'appointments' && styles.activeTab]}
-          onPress={() => setActiveTab('appointments')}
-        >
-          <Text style={[styles.tabText, activeTab === 'appointments' && styles.activeTabText]}>Appointments</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'tests' && styles.activeTab]}
-          onPress={() => setActiveTab('tests')}
-        >
-          <Text style={[styles.tabText, activeTab === 'tests' && styles.activeTabText]}>Lab Tests</Text>
-        </TouchableOpacity>
-      </View>
+    <div className="flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white overflow-hidden font-sans">
+      
+      
 
       {/* Main Content */}
-      {renderContent()}
+      <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
+        
+        {/* Header Row */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Ongoing Services</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage active patient appointments and lab tests.</p>
+          </div>
+          
+          <div className="flex bg-white dark:bg-[#1E293B] p-1 rounded-xl border border-gray-200 dark:border-gray-800 shrink-0">
+            <button 
+              onClick={() => setActiveTab('appointments')}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${
+                activeTab === 'appointments' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
+              }`}
+            >
+              Appointments
+            </button>
+            <button 
+              onClick={() => setActiveTab('tests')}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${
+                activeTab === 'tests' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
+              }`}
+            >
+              Lab Tests
+            </button>
+          </div>
+        </header>
 
-      {/* Sleek Toast */}
-      {toastVisible && (
-        <Animated.View style={[styles.toastContainer, { opacity: toastOpacity }]}>
-          <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-          <Text style={styles.toastText}>{toastMessage.current}</Text>
-        </Animated.View>
-      )}
-    </View>
+        {/* Dynamic Content Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+          
+          {activeTab === 'appointments' && (
+            loadingAppointments ? (
+              /* Skeleton Loaders */
+              [1, 2, 3, 4].map(n => (
+                <div key={n} className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 flex flex-col animate-pulse">
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-800 rounded-full" />
+                    <div className="flex-1">
+                      <div className="w-1/2 h-4 bg-gray-200 dark:bg-gray-800 rounded-md mb-2" />
+                      <div className="w-1/3 h-3 bg-gray-200 dark:bg-gray-800 rounded-md" />
+                    </div>
+                  </div>
+                  <div className="w-3/4 h-4 bg-gray-200 dark:bg-gray-800 rounded-md mb-2" />
+                  <div className="w-1/4 h-5 bg-gray-200 dark:bg-gray-800 rounded-md mb-6" />
+                  <div className="w-full h-10 bg-gray-200 dark:bg-gray-800 rounded-xl mt-auto" />
+                </div>
+              ))
+            ) : ongoingAppointments.length === 0 ? (
+              /* Empty State */
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                <CalendarClock className="w-16 h-16 text-gray-400 dark:text-gray-700 mb-4" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-400">No Records Found</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-600 mt-2">There is currently no data to display here.</p>
+              </div>
+            ) : (
+              ongoingAppointments.map(item => (
+                <div key={item.id} className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 hover:border-gray-600 transition-colors flex flex-col">
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="w-10 h-10 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-full flex items-center justify-center text-yellow-400">
+                      <Stethoscope size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 dark:text-white">Dr. {item.doctorName}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.date} at {item.time}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2 mb-6">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Patient: {item.patientName}</p>
+                    <div className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-2 py-1 rounded inline-block w-fit">
+                      In Progress
+                    </div>
+                  </div>
+
+                  <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <button
+                      disabled={processingId === item.id}
+                      onClick={() => handleCheckout(item.id, 'available_slots', item.patientId, item.patientPhone)}
+                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                        processingId === item.id 
+                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                          : 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white border border-green-500/20'
+                      }`}
+                    >
+                      {processingId === item.id ? 'Processing...' : (
+                        <>
+                          <CheckCircle size={16} />
+                          Checkout
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )
+          )}
+
+          {activeTab === 'tests' && (
+            loadingTests ? (
+              /* Skeleton Loaders */
+              [1, 2, 3, 4].map(n => (
+                <div key={n} className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 flex flex-col animate-pulse">
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-800 rounded-full" />
+                    <div className="flex-1">
+                      <div className="w-1/2 h-4 bg-gray-200 dark:bg-gray-800 rounded-md mb-2" />
+                      <div className="w-1/3 h-3 bg-gray-200 dark:bg-gray-800 rounded-md" />
+                    </div>
+                  </div>
+                  <div className="w-3/4 h-4 bg-gray-200 dark:bg-gray-800 rounded-md mb-2" />
+                  <div className="w-1/4 h-5 bg-gray-200 dark:bg-gray-800 rounded-md mb-6" />
+                  <div className="w-full h-10 bg-gray-200 dark:bg-gray-800 rounded-xl mt-auto" />
+                </div>
+              ))
+            ) : ongoingTests.length === 0 ? (
+              /* Empty State */
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                <Activity className="w-16 h-16 text-gray-400 dark:text-gray-700 mb-4" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-400">No Records Found</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-600 mt-2">There is currently no data to display here.</p>
+              </div>
+            ) : (
+              ongoingTests.map(item => (
+                <div key={item.id} className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 hover:border-gray-600 transition-colors flex flex-col">
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="w-10 h-10 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-full flex items-center justify-center text-blue-400">
+                      <Activity size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{item.testName}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.requestedDate} at {item.requestedTime}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 mb-6">
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Patient</p>
+                    <p className="font-medium text-gray-900 dark:text-white mb-1">{item.patientName}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{item.patientPhone}</p>
+                  </div>
+
+                  <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <button
+                      disabled={processingId === item.id}
+                      onClick={() => handleCheckout(item.id, 'test_requests', item.patientId, item.patientPhone)}
+                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                        processingId === item.id 
+                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                          : 'bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20'
+                      }`}
+                    >
+                      {processingId === item.id ? 'Processing...' : (
+                        <>
+                          <CheckCircle size={16} />
+                          Complete Test
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )
+          )}
+
+        </div>
+
+      </main>
+
+      
+
+    </div>
   );
 }
-
-const getStyles = (theme, isDarkMode) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.lg,
-  },
-  headerTitle: {
-    ...theme.typography.header,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    marginBottom: theme.spacing.xl,
-    marginTop: 20,
-    fontSize: 28,
-  },
-  // Tab UI Styles
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: isDarkMode ? '#1A1A1A' : '#EEEEEE',
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.xl,
-    padding: 4,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.borderRadius.md - 4,
-  },
-  activeTab: {
-    backgroundColor: theme.colors.primary,
-  },
-  tabText: {
-    ...theme.typography.title,
-    fontSize: 14,
-    color: isDarkMode ? '#AAAAAA' : theme.colors.textLight,
-  },
-  activeTabText: {
-    color: '#1A1A1A',
-  },
-  listContainer: {
-    paddingBottom: theme.spacing.xl,
-  },
-  card: {
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.lg,
-  },
-  cardTitle: {
-    ...theme.typography.title,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    fontSize: 20,
-    marginBottom: theme.spacing.md,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.sm,
-  },
-  detailLabel: {
-    ...theme.typography.body,
-    fontWeight: '600',
-    color: isDarkMode ? '#CCCCCC' : theme.colors.textLight,
-    width: 100,
-  },
-  detailValue: {
-    ...theme.typography.body,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    flex: 1,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: isDarkMode ? '#333333' : '#EEEEEE',
-    marginVertical: theme.spacing.md,
-  },
-  doneButton: {
-    marginTop: theme.spacing.md,
-    backgroundColor: theme.colors.primary,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    ...theme.typography.body,
-    color: theme.colors.textLight,
-    fontSize: 16,
-  },
-  toastContainer: {
-    position: 'absolute',
-    bottom: 50,
-    left: 20,
-    right: 20,
-    backgroundColor: isDarkMode ? '#2A2A2A' : '#FFFFFF',
-    borderRadius: 30,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    borderWidth: 1,
-    borderColor: isDarkMode ? '#444' : '#E0E0E0',
-    zIndex: 999,
-  },
-  toastText: {
-    ...theme.typography.body,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    marginLeft: 12,
-    flex: 1,
-    fontWeight: '500',
-  }
-});

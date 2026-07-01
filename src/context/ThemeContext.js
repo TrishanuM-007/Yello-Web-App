@@ -13,6 +13,22 @@ export function ThemeProvider({ children }) {
     setIsDarkMode(systemColorScheme === 'dark');
   }, [systemColorScheme]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.document) {
+      // Ensure Tailwind knows we are using class-based dark mode
+      if (!window.tailwind) {
+        window.tailwind = {};
+      }
+      window.tailwind.config = { ...window.tailwind.config, darkMode: 'class' };
+
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [isDarkMode]);
+
   const toggleTheme = () => {
     setIsDarkMode(prev => !prev);
   };

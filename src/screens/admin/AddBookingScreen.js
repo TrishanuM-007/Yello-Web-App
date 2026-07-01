@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import ClayButton from '../../components/ClayButton';
-import ClayCard from '../../components/ClayCard';
 import { db } from '../../config/firebase';
-import { collection, onSnapshot, doc, updateDoc, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
+import { collection, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { Menu, Search, Filter, CalendarPlus, UserPlus, Clock, X, Beaker, CheckCircle } from 'lucide-react';
+import { Platform, View, Text } from 'react-native';
+import DoctorBookingModal from '../../components/DoctorBookingModal';
 
 export default function AddBookingScreen({ navigation }) {
-  const { theme, isDarkMode } = useTheme();
-  const styles = getStyles(theme, isDarkMode);
-
+  const { isDarkMode } = useTheme();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('doctors'); // 'doctors' or 'tests'
 
   // Doctors State
@@ -34,8 +31,6 @@ export default function AddBookingScreen({ navigation }) {
   // Doctor Booking Modal
   const [isDoctorModalVisible, setIsDoctorModalVisible] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [selectedSlotId, setSelectedSlotId] = useState(null);
-  const [isBookingDoctor, setIsBookingDoctor] = useState(false);
 
   // Test Booking Modal
   const [isTestModalVisible, setIsTestModalVisible] = useState(false);
@@ -43,6 +38,15 @@ export default function AddBookingScreen({ navigation }) {
   const [manualDate, setManualDate] = useState('');
   const [manualTime, setManualTime] = useState('');
   const [isBookingTest, setIsBookingTest] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && !document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+  }, []);
 
   useEffect(() => {
     // Fetch Doctors
@@ -89,7 +93,6 @@ export default function AddBookingScreen({ navigation }) {
       return { ...doc, availableSlots: docSlots, hasSlots: docSlots.length > 0 };
     });
 
-    // Filter
     if (doctorSearch) {
       result = result.filter(d => d.name?.toLowerCase().includes(doctorSearch.toLowerCase()));
     }
@@ -97,7 +100,6 @@ export default function AddBookingScreen({ navigation }) {
       result = result.filter(d => d.specialty === specialtyFilter);
     }
 
-    // Sort: Available first, then Unavailable
     result.sort((a, b) => {
       if (a.hasSlots && !b.hasSlots) return -1;
       if (!a.hasSlots && b.hasSlots) return 1;
@@ -111,35 +113,7 @@ export default function AddBookingScreen({ navigation }) {
 
   const handleOpenDoctorModal = (doctor) => {
     setSelectedDoctor(doctor);
-    setPatientSearch('');
-    setSelectedPatientId(null);
-    setSelectedSlotId(null);
     setIsDoctorModalVisible(true);
-  };
-
-  const confirmDoctorBooking = async () => {
-    if (!selectedPatientId || !selectedSlotId) {
-      window.alert('Error: Please select a patient and an available slot.');
-      return;
-    }
-
-    setIsBookingDoctor(true);
-    try {
-      const slotRef = doc(db, 'available_slots', selectedSlotId);
-      await updateDoc(slotRef, {
-        isBooked: true,
-        status: 'confirmed',
-        patientId: selectedPatientId,
-        bookedAt: new Date().toISOString()
-      });
-      window.alert('Success: Doctor appointment booked!');
-      setIsDoctorModalVisible(false);
-    } catch (error) {
-      console.error(error);
-      window.alert('Error: Failed to book appointment.');
-    } finally {
-      setIsBookingDoctor(false);
-    }
   };
 
   // -------------------------
@@ -162,7 +136,8 @@ export default function AddBookingScreen({ navigation }) {
     setIsTestModalVisible(true);
   };
 
-  const confirmTestBooking = async () => {
+  const confirmTestBooking = async (e) => {
+    if (e) e.preventDefault();
     if (!selectedPatientId || !manualDate || !manualTime) {
       window.alert('Error: Please select a patient, date, and time.');
       return;
@@ -199,497 +174,181 @@ export default function AddBookingScreen({ navigation }) {
     }
   };
 
-  // -------------------------
-  // SHARED MODAL HELPERS
-  // -------------------------
   const filteredPatients = useMemo(() => {
     if (!patientSearch) return [];
-    return patients.filter(p => 
-      p.name?.toLowerCase().includes(patientSearch.toLowerCase()) || 
+    return patients.filter(p =>
+      p.name?.toLowerCase().includes(patientSearch.toLowerCase()) ||
       p.phoneNumber?.includes(patientSearch)
-    ).slice(0, 5); // Max 5 results for simplicity
+    ).slice(0, 5);
   }, [patients, patientSearch]);
 
-  // -------------------------
-  // RENDERERS
-  // -------------------------
-  const renderDoctorItem = ({ item }) => {
-    const isAvailable = item.hasSlots;
+  if (Platform.OS !== 'web') {
     return (
-      <TouchableOpacity onPress={() => isAvailable && handleOpenDoctorModal(item)} activeOpacity={isAvailable ? 0.7 : 1}>
-        <ClayCard style={[styles.card, !isAvailable && styles.cardDisabled]}>
-          <View style={styles.cardRow}>
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={[styles.docImage, !isAvailable && styles.imageDisabled]} />
-            ) : (
-              <View style={[styles.docAvatarPlaceholder, !isAvailable && styles.imageDisabled]}>
-                <Ionicons name="person" size={24} color="#FFF" />
-              </View>
-            )}
-            <View style={styles.cardInfo}>
-              <Text style={[styles.cardTitle, !isAvailable && styles.textDisabled]}>{item.name}</Text>
-              <Text style={styles.cardSubtitle}>{item.specialty}</Text>
-              <Text style={styles.cardDesc} numberOfLines={2}>{item.description || 'No description available.'}</Text>
-              
-              <Text style={[styles.availabilityText, isAvailable ? styles.availableGreen : styles.unavailableRed]}>
-                {isAvailable ? `${item.availableSlots.length} Slots Available` : 'No Slots Available'}
-              </Text>
-            </View>
-          </View>
-        </ClayCard>
-      </TouchableOpacity>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>This highly styled component is optimized for Web only.</Text>
+      </View>
     );
-  };
-
-  const renderTestItem = ({ item }) => (
-    <TouchableOpacity onPress={() => handleOpenTestModal(item)}>
-      <ClayCard style={styles.card}>
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle}>{item.testName || item.name}</Text>
-          <Text style={styles.testPrice}>₹{item.price}</Text>
-          {item.description && (
-            <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
-          )}
-        </View>
-      </ClayCard>
-    </TouchableOpacity>
-  );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'doctors' && styles.activeTab]}
-          onPress={() => setActiveTab('doctors')}
-        >
-          <Text style={[styles.tabText, activeTab === 'doctors' && styles.activeTabText]}>Doctor Appointments</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'tests' && styles.activeTab]}
-          onPress={() => setActiveTab('tests')}
-        >
-          <Text style={[styles.tabText, activeTab === 'tests' && styles.activeTabText]}>Schedule Test</Text>
-        </TouchableOpacity>
-      </View>
+    <div className={`flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white ${isDarkMode ? 'dark' : ''}  overflow-hidden font-sans`}>
 
-      {/* DOCTORS TAB */}
-      {activeTab === 'doctors' && (
-        <>
-          <View style={styles.filterRow}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search Doctors..."
-              placeholderTextColor="#666666"
-              value={doctorSearch}
-              onChangeText={setDoctorSearch}
-            />
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={specialtyFilter}
-                onValueChange={setSpecialtyFilter}
-                style={styles.picker}
-              >
-                {specialties.map(spec => (
-                  <Picker.Item key={spec} label={spec} value={spec} color="#000000" />
-                ))}
-              </Picker>
-            </View>
-          </View>
 
-          {loadingDoctors ? (
-            <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 40 }} />
-          ) : mergedDoctors.length === 0 ? (
-            <Text style={styles.emptyText}>No doctors found.</Text>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
+
+        {/* Header Row */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Create Booking</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Schedule new doctor appointments or lab tests.</p>
+          </div>
+
+          <div className="flex bg-white dark:bg-[#1E293B] p-1 rounded-xl border border-gray-200 dark:border-gray-800 shrink-0">
+            <button
+              onClick={() => setActiveTab('doctors')}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'doctors' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
+                }`}
+            >
+              Doctors
+            </button>
+            <button
+              onClick={() => navigation.navigate('AvailableTests')}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all text-gray-500 dark:text-gray-400 hover:text-white`}
+            >
+              Lab Tests
+            </button>
+          </div>
+        </header>
+
+        {/* Dynamic Toolbar */}
+        <div className="flex flex-wrap items-center gap-4 mb-6 shrink-0 bg-white dark:bg-[#1E293B] p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+          {activeTab === 'doctors' ? (
+            <>
+              <div className="flex-1 min-w-[200px] relative">
+                <Search size={18} className="absolute left-3 top-3 text-gray-500 dark:text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search Doctors..."
+                  value={doctorSearch}
+                  onChange={(e) => setDoctorSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+                />
+              </div>
+              <div className="w-48 relative">
+                <Filter size={16} className="absolute left-3 top-3 text-gray-500 dark:text-gray-400" />
+                <select
+                  value={specialtyFilter}
+                  onChange={(e) => setSpecialtyFilter(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none cursor-pointer appearance-none transition-colors"
+                >
+                  {specialties.map(spec => (
+                    <option key={spec} value={spec}>{spec}</option>
+                  ))}
+                </select>
+              </div>
+            </>
           ) : (
-            <FlatList
-              data={mergedDoctors}
-              keyExtractor={item => item.id}
-              renderItem={renderDoctorItem}
-              contentContainerStyle={{ paddingBottom: 40 }}
-            />
+            <div className="flex-1 min-w-[200px] relative">
+              <Search size={18} className="absolute left-3 top-3 text-gray-500 dark:text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search Tests..."
+                value={testSearch}
+                onChange={(e) => setTestSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+              />
+            </div>
           )}
-        </>
-      )}
+        </div>
 
-      {/* TESTS TAB */}
-      {activeTab === 'tests' && (
-        <>
-          <View style={styles.filterRow}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search Tests..."
-              placeholderTextColor="#666666"
-              value={testSearch}
-              onChangeText={setTestSearch}
-            />
-          </View>
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
 
-          {loadingTests ? (
-            <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 40 }} />
-          ) : filteredTests.length === 0 ? (
-            <Text style={styles.emptyText}>No tests found.</Text>
-          ) : (
-            <FlatList
-              data={filteredTests}
-              keyExtractor={item => item.id}
-              renderItem={renderTestItem}
-              contentContainerStyle={{ paddingBottom: 40 }}
-            />
+          {activeTab === 'doctors' && (
+            loadingDoctors ? (
+              <div className="col-span-full py-10 text-center text-gray-500 animate-pulse">Loading doctors...</div>
+            ) : mergedDoctors.length === 0 ? (
+              <div className="col-span-full p-10 text-center text-gray-500 bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl border-dashed">
+                No doctors found.
+              </div>
+            ) : (
+              mergedDoctors.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => item.hasSlots && handleOpenDoctorModal(item)}
+                  className={`bg-white dark:bg-[#1E293B] border rounded-2xl p-5 transition-all flex flex-col ${item.hasSlots ? 'border-gray-200 dark:border-gray-800 hover:border-gray-600 cursor-pointer hover:-translate-y-1 hover:shadow-lg' : 'border-gray-800/50 opacity-60 cursor-not-allowed'
+                    }`}
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-300 dark:border-gray-700" />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0">
+                        <UserPlus size={24} />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate">Dr. {item.name}</h3>
+                      <p className="text-sm text-yellow-400 font-medium truncate">{item.specialty}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-2 min-h-[40px]">
+                    {item.description || 'No description available.'}
+                  </p>
+
+                  <div className={`mt-auto py-2.5 rounded-xl text-center text-sm font-bold border ${item.hasSlots ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'
+                    }`}>
+                    {item.hasSlots ? `${item.availableSlots.length} Slots Available` : 'Fully Booked'}
+                  </div>
+                </div>
+              ))
+            )
           )}
-        </>
-      )}
 
-      {/* DOCTOR BOOKING MODAL */}
-      <Modal visible={isDoctorModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Book Doctor Appointment</Text>
-            {selectedDoctor && <Text style={styles.modalSubtitle}>Dr. {selectedDoctor.name}</Text>}
-
-            <Text style={styles.label}>1. Select Patient</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Type Name or Phone..."
-              placeholderTextColor="#666666"
-              value={patientSearch}
-              onChangeText={(text) => {
-                setPatientSearch(text);
-                setSelectedPatientId(null);
-              }}
-            />
-            {filteredPatients.length > 0 && !selectedPatientId && (
-              <View style={styles.dropdownContainer}>
-                {filteredPatients.map(p => (
-                  <TouchableOpacity key={p.id} style={styles.dropdownItem} onPress={() => {
-                    setSelectedPatientId(p.id);
-                    setPatientSearch(`${p.name} (${p.phoneNumber})`);
-                  }}>
-                    <Text style={styles.dropdownItemText}>{p.name} - {p.phoneNumber}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.label}>2. Select Available Slot</Text>
-            <View style={styles.pickerWrapperModal}>
-              <Picker
-                selectedValue={selectedSlotId}
-                onValueChange={setSelectedSlotId}
-                style={styles.picker}
-              >
-                <Picker.Item label="-- Choose Slot --" value={null} color="#000000" />
-                {selectedDoctor?.availableSlots.map(slot => (
-                  <Picker.Item key={slot.id} label={`${slot.date} at ${slot.time}`} value={slot.id} color="#000000" />
-                ))}
-              </Picker>
-            </View>
-
-            <ClayButton title="Confirm Booking" onPress={confirmDoctorBooking} loading={isBookingDoctor} style={{ marginTop: 20 }} />
-            <ClayButton title="Cancel" variant="secondary" onPress={() => setIsDoctorModalVisible(false)} style={{ marginTop: 10 }} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* TEST BOOKING MODAL */}
-      <Modal visible={isTestModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Schedule Lab Test</Text>
-            {selectedTest && <Text style={styles.modalSubtitle}>{selectedTest.testName || selectedTest.name}</Text>}
-
-            <Text style={styles.label}>1. Select Patient</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Type Name or Phone..."
-              placeholderTextColor="#666666"
-              value={patientSearch}
-              onChangeText={(text) => {
-                setPatientSearch(text);
-                setSelectedPatientId(null);
-              }}
-            />
-            {filteredPatients.length > 0 && !selectedPatientId && (
-              <View style={styles.dropdownContainer}>
-                {filteredPatients.map(p => (
-                  <TouchableOpacity key={p.id} style={styles.dropdownItem} onPress={() => {
-                    setSelectedPatientId(p.id);
-                    setPatientSearch(`${p.name} (${p.phoneNumber})`);
-                  }}>
-                    <Text style={styles.dropdownItemText}>{p.name} - {p.phoneNumber}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.label}>2. Date</Text>
-            {Platform.OS === 'web' ? (
-              <input 
-                type="date"
-                value={manualDate}
-                onChange={(e) => setManualDate(e.target.value)}
-                style={{
-                  border: '1px solid #CCCCCC',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#000000',
-                  fontSize: '16px',
-                  width: '100%',
-                  height: '48px',
-                }}
-              />
+          {activeTab === 'tests' && (
+            loadingTests ? (
+              <div className="col-span-full py-10 text-center text-gray-500 animate-pulse">Loading tests...</div>
+            ) : filteredTests.length === 0 ? (
+              <div className="col-span-full p-10 text-center text-gray-500 bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl border-dashed">
+                No lab tests found.
+              </div>
             ) : (
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 2026-06-20"
-                placeholderTextColor="#666666"
-                value={manualDate}
-                onChangeText={setManualDate}
-              />
-            )}
+              filteredTests.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => handleOpenTestModal(item)}
+                  className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 hover:border-gray-600 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg flex flex-col group"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="w-12 h-12 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-full flex items-center justify-center text-blue-400 shrink-0 group-hover:text-yellow-400 transition-colors">
+                      <Beaker size={20} />
+                    </div>
+                    <span className="font-black text-gray-900 dark:text-white text-lg bg-gray-200 dark:bg-gray-800 px-3 py-1 rounded-lg">₹{item.price}</span>
+                  </div>
 
-            <Text style={styles.label}>3. Time</Text>
-            {Platform.OS === 'web' ? (
-              <input 
-                type="time"
-                value={manualTime}
-                onChange={(e) => setManualTime(e.target.value)}
-                style={{
-                  border: '1px solid #CCCCCC',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#000000',
-                  fontSize: '16px',
-                  width: '100%',
-                  height: '48px',
-                  marginTop: '8px'
-                }}
-              />
-            ) : (
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 10:30 AM"
-                placeholderTextColor="#666666"
-                value={manualTime}
-                onChangeText={setManualTime}
-              />
-            )}
+                  <h3 className="font-bold text-gray-900 dark:text-white text-lg mt-3 truncate">{item.testName || item.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 line-clamp-3">
+                    {item.description || 'No description available for this test.'}
+                  </p>
 
-            <ClayButton title="Confirm Booking" onPress={confirmTestBooking} loading={isBookingTest} style={{ marginTop: 20 }} />
-            <ClayButton title="Cancel" variant="secondary" onPress={() => setIsTestModalVisible(false)} style={{ marginTop: 10 }} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-yellow-400 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    Schedule Test <ChevronRight size={16} />
+                  </div>
+                </div>
+              ))
+            )
+          )}
 
-    </View>
+        </div>
+
+      </main>
+
+
+
+
+    </div>
   );
 }
-
-const getStyles = (theme, isDarkMode) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.lg,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: isDarkMode ? '#1A1A1A' : '#EEEEEE',
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.xl,
-    padding: 4,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.borderRadius.md - 4,
-  },
-  activeTab: {
-    backgroundColor: theme.colors.primary,
-  },
-  tabText: {
-    ...theme.typography.title,
-    fontSize: 14,
-    color: isDarkMode ? '#AAAAAA' : theme.colors.textLight,
-  },
-  activeTabText: {
-    color: '#1A1A1A',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.xl,
-    gap: theme.spacing.sm,
-  },
-  searchInput: {
-    flex: 2,
-    backgroundColor: '#FFFFFF',
-    color: '#000000',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  pickerWrapper: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: 'hidden',
-    height: 48,
-    justifyContent: 'center',
-  },
-  pickerWrapperModal: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: 'hidden',
-    height: 48,
-    justifyContent: 'center',
-  },
-  picker: {
-    width: '100%',
-    height: '100%',
-    color: '#000000',
-    backgroundColor: '#FFFFFF',
-  },
-  emptyText: {
-    color: theme.colors.textLight,
-    textAlign: 'center',
-    marginTop: 40,
-    fontSize: 16,
-  },
-  // Card Styles
-  card: {
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
-  },
-  cardDisabled: {
-    opacity: 0.6,
-    backgroundColor: isDarkMode ? '#222' : '#F5F5F5',
-  },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  docImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: theme.spacing.md,
-  },
-  docAvatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: theme.colors.primary,
-    marginRight: theme.spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageDisabled: {
-    opacity: 0.5,
-    tintColor: 'gray', // For actual image, might not work perfectly but opacity helps
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  cardTitle: {
-    ...theme.typography.title,
-    fontSize: 18,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-  },
-  textDisabled: {
-    color: theme.colors.textLight,
-  },
-  cardSubtitle: {
-    ...theme.typography.body,
-    fontSize: 14,
-    color: theme.colors.primary,
-    marginTop: 2,
-  },
-  cardDesc: {
-    ...theme.typography.body,
-    fontSize: 13,
-    color: theme.colors.textLight,
-    marginTop: 4,
-  },
-  availabilityText: {
-    ...theme.typography.title,
-    fontSize: 13,
-    marginTop: 8,
-  },
-  availableGreen: {
-    color: '#34C759',
-  },
-  unavailableRed: {
-    color: '#FF3B30',
-  },
-  testPrice: {
-    ...theme.typography.title,
-    color: theme.colors.primary,
-    marginTop: 4,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
-  },
-  modalContent: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.xl,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    ...theme.typography.header,
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    ...theme.typography.title,
-    color: theme.colors.primary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-    marginTop: 4,
-  },
-  label: {
-    ...theme.typography.title,
-    fontSize: 14,
-    color: theme.colors.text,
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.xs,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    backgroundColor: '#FFFFFF',
-    color: '#000000',
-    height: 48,
-  },
-  dropdownContainer: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface,
-    marginTop: 4,
-    maxHeight: 150,
-  },
-  dropdownItem: {
-    padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  dropdownItemText: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-  }
-});

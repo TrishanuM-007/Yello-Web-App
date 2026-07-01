@@ -1,14 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { useTheme } from '../../context/ThemeContext';
+import { Menu, UploadCloud, FileText, Image as ImageIcon, Download, Loader2 } from 'lucide-react';
+import { Platform, View, Text } from 'react-native';
 import * as PDFLib from 'pdf-lib/dist/pdf-lib.min.js';
 const { PDFDocument, rgb } = PDFLib;
-import { useTheme } from '../../context/ThemeContext';
-import ClayButton from '../../components/ClayButton';
-import ClayCard from '../../components/ClayCard';
 
 export default function UploadTestReportScreen() {
-  const { theme, isDarkMode } = useTheme();
-  const styles = getStyles(theme, isDarkMode);
+  const { isDarkMode } = useTheme();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [logoFile, setLogoFile] = useState(null);
   const [logoUri, setLogoUri] = useState(null);
@@ -17,6 +16,15 @@ export default function UploadTestReportScreen() {
 
   const logoInputRef = useRef(null);
   const pdfInputRef = useRef(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && !document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+  }, []);
 
   const handleLogoSelect = (e) => {
     const file = e.target.files[0];
@@ -48,7 +56,7 @@ export default function UploadTestReportScreen() {
       const pdfArrayBuffer = await pdfFile.arrayBuffer();
       const logoArrayBuffer = await logoFile.arrayBuffer();
 
-      const pdfDoc = await PDFLib.PDFDocument.load(pdfArrayBuffer);
+      const pdfDoc = await PDFDocument.load(pdfArrayBuffer);
 
       let embeddedLogo;
       if (logoFile.type === 'image/jpeg' || logoFile.type === 'image/jpg') {
@@ -65,35 +73,29 @@ export default function UploadTestReportScreen() {
 
         // Element 1 (Address)
         page.drawText('Address: GV Pride, 3rd Floor Gandipet Main Rd, Kokapet 500075, Telangana, India', {
-          x: 50,
+          x: 30,
           y: height - 40,
           size: 10,
-          color: PDFLib.rgb(0.3, 0.3, 0.3)
+          color: rgb(0.3, 0.3, 0.3)
         });
 
         // Element 2 (Contact)
         page.drawText('www.yelloclinics.com | info@yelloclinics.com | @yello.medi', {
-          x: 50,
+          x: 30,
           y: height - 55,
           size: 10,
-          color: PDFLib.rgb(0.3, 0.3, 0.3)
+          color: rgb(0.3, 0.3, 0.3)
         });
 
         // Element 3 (Logo Image)
         page.drawImage(embeddedLogo, {
-          x: width - logoDims.width - 40,
-          y: height - logoDims.height - 30,
+          x: width - logoDims.width - 30,
+          y: height - logoDims.height - 20,
           width: logoDims.width,
           height: logoDims.height
         });
 
-        // Element 4 (Sub-branding Text)
-        page.drawText('Clinics Diagnostics', {
-          x: width - 150,
-          y: height - logoDims.height - 45,
-          size: 12,
-          color: PDFLib.rgb(0.3, 0.3, 0.3)
-        });
+
       }
 
       const pdfBytes = await pdfDoc.save();
@@ -116,13 +118,29 @@ export default function UploadTestReportScreen() {
     }
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.title}>Format Report</Text>
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>This component is optimized for Web only.</Text>
+      </View>
+    );
+  }
 
-      {/* Hidden Web Inputs */}
-      {Platform.OS === 'web' && (
-        <>
+  return (
+    <div className={`flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white ${isDarkMode ? 'dark' : ''}  overflow-hidden font-sans`}>
+
+
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0 items-center">
+
+        <div className="w-full max-w-3xl flex flex-col w-full mt-4">
+          {/* Header Row */}
+          <header className="flex flex-col gap-2 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6 text-center">
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Brand PDF Reports</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Upload a raw lab report to inject Yello Clinics branding and headers automatically.</p>
+          </header>
+
           <input
             type="file"
             accept="image/png, image/jpeg"
@@ -137,97 +155,76 @@ export default function UploadTestReportScreen() {
             style={{ display: 'none' }}
             onChange={handlePdfSelect}
           />
-        </>
-      )}
 
-      <ClayCard style={styles.card}>
-        <Text style={styles.label}>1. Select Clinic Logo</Text>
-        <ClayButton
-          title="Pick Logo Image"
-          onPress={() => logoInputRef.current?.click()}
-          variant="secondary"
-          style={styles.button}
-        />
+          <div className="w-full bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-3xl p-8 md:p-10 flex flex-col gap-8 shadow-xl">
 
-        {logoUri && (
-          <View style={styles.previewContainer}>
-            <Image
-              source={{ uri: logoUri }}
-              style={{ width: 100, height: 100, resizeMode: 'contain' }}
-            />
-          </View>
-        )}
+            {/* Step 1: Logo */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-yellow-400/20 text-yellow-400 flex items-center justify-center text-xs">1</span>
+                Select Clinic Logo
+              </h2>
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-gray-600 hover:border-yellow-400 bg-gray-50 dark:bg-[#0F172A] rounded-2xl p-8 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:text-yellow-400 transition-colors gap-3"
+              >
+                {logoUri ? (
+                  <img src={logoUri} alt="Logo preview" className="h-16 object-contain" />
+                ) : (
+                  <>
+                    <ImageIcon size={32} />
+                    <span className="font-medium">Click to upload logo (PNG/JPG)</span>
+                  </>
+                )}
+              </button>
+            </div>
 
-        <Text style={[styles.label, { marginTop: theme.spacing.xl }]}>2. Select PDF Report</Text>
-        <ClayButton
-          title={pdfFile ? `Selected: ${pdfFile.name}` : "Pick Raw PDF"}
-          onPress={() => pdfInputRef.current?.click()}
-          variant="secondary"
-          style={styles.button}
-        />
+            {/* Step 2: PDF */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-yellow-400/20 text-yellow-400 flex items-center justify-center text-xs">2</span>
+                Select Raw PDF
+              </h2>
+              <button
+                onClick={() => pdfInputRef.current?.click()}
+                className={`w-full border-2 rounded-2xl p-6 flex items-center justify-center transition-colors gap-3 font-bold ${pdfFile ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-gray-600 border-dashed bg-gray-50 dark:bg-[#0F172A] text-gray-500 dark:text-gray-400 hover:border-yellow-400 hover:text-yellow-400'
+                  }`}
+              >
+                <FileText size={24} />
+                {pdfFile ? pdfFile.name : 'Select PDF Report'}
+              </button>
+            </div>
 
-        <Text style={[styles.label, { marginTop: theme.spacing.xl }]}>3. Apply Branding</Text>
-        <ClayButton
-          title="Format & Download PDF"
-          onPress={applyBrandingAndDownload}
-          style={styles.button}
-          disabled={isProcessing}
-        />
+            {/* Step 3: Action */}
+            <div className="flex flex-col gap-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <button
+                onClick={applyBrandingAndDownload}
+                disabled={isProcessing}
+                className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all ${isProcessing
+                  ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                  : 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 shadow-[0_4px_15px_rgb(250,204,21,0.2)] hover:shadow-[0_6px_20px_rgb(250,204,21,0.3)] hover:-translate-y-0.5'
+                  }`}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    Processing PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download size={20} />
+                    Format & Download Branded PDF
+                  </>
+                )}
+              </button>
+            </div>
 
-        {isProcessing && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Processing PDF...</Text>
-          </View>
-        )}
-      </ClayCard>
-    </ScrollView>
+          </div>
+
+        </div>
+      </main>
+
+
+    </div>
   );
 }
-
-const getStyles = (theme, isDarkMode) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    padding: theme.spacing.xl,
-    paddingTop: 40,
-  },
-  title: {
-    ...theme.typography.header,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    marginBottom: theme.spacing.xl,
-  },
-  card: {
-    width: '100%',
-    padding: theme.spacing.lg,
-  },
-  label: {
-    ...theme.typography.title,
-    fontSize: 16,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  button: {
-    marginBottom: theme.spacing.md,
-  },
-  previewContainer: {
-    alignItems: 'center',
-    marginVertical: theme.spacing.md,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.surface,
-  },
-  loadingContainer: {
-    marginTop: theme.spacing.lg,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: theme.spacing.sm,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-    ...theme.typography.body,
-  }
-});

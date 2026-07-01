@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
-import ClayButton from '../../components/ClayButton';
-import ClayCard from '../../components/ClayCard';
 import { db } from '../../config/firebase';
 import { collection, onSnapshot, doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
+import { 
+  Search, Users, Plus, Trash2, CheckSquare, Square, Menu, X, ChevronRight, Filter
+} from 'lucide-react';
+import { Platform, View, Text } from 'react-native';
+import toast from 'react-hot-toast';
 
 export default function PatientDashboardScreen({ navigation }) {
-  const { theme, isDarkMode } = useTheme();
-  const styles = getStyles(theme, isDarkMode);
+  // Navigation sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  // Core Data
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +33,15 @@ export default function PatientDashboardScreen({ navigation }) {
   const [selectedPatientIds, setSelectedPatientIds] = useState([]);
 
   useEffect(() => {
+    if (Platform.OS === 'web' && !document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  useEffect(() => {
     const unsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
       const pList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setPatients(pList);
@@ -43,11 +52,10 @@ export default function PatientDashboardScreen({ navigation }) {
 
   const handleAddPatient = async () => {
     if (!newName.trim() || !newPhone.trim() || !newAge.trim()) {
-      window.alert('Error: Name, Phone, and Age are required.');
+      toast.error('Error: Name, Phone, and Age are required.');
       return;
     }
 
-    // Format phone (very simple format)
     const phoneId = newPhone.trim().replace(/\s+/g, '');
     
     setIsSubmitting(true);
@@ -55,7 +63,7 @@ export default function PatientDashboardScreen({ navigation }) {
       const patientRef = doc(db, 'patients', phoneId);
       const snap = await getDoc(patientRef);
       if (snap.exists()) {
-        window.alert('Error: A patient with this phone number already exists.');
+        toast.error('Error: A patient with this phone number already exists.');
         setIsSubmitting(false);
         return;
       }
@@ -69,16 +77,16 @@ export default function PatientDashboardScreen({ navigation }) {
         createdAt: new Date().toISOString()
       });
 
-      window.alert('Success: Patient added successfully.');
       setAddModalVisible(false);
       setNewName('');
       setNewPhone('');
       setNewAge('');
       setNewGender('Male');
       setNewHistory('');
+      toast.success('Patient added successfully!');
     } catch (error) {
       console.error(error);
-      window.alert('Error: Could not add patient.');
+      toast.error('Error: Could not add patient.');
     } finally {
       setIsSubmitting(false);
     }
@@ -92,12 +100,12 @@ export default function PatientDashboardScreen({ navigation }) {
       try {
         const batchPromises = selectedPatientIds.map(id => deleteDoc(doc(db, 'patients', id)));
         await Promise.all(batchPromises);
-        window.alert('Success: Patients deleted successfully.');
         setIsSelectionMode(false);
         setSelectedPatientIds([]);
+        toast.success(`Successfully deleted ${selectedPatientIds.length} patient(s).`);
       } catch (error) {
         console.error('Error batch deleting patients:', error);
-        window.alert('Error: Failed to delete some patients.');
+        toast.error('Error: Failed to delete some patients.');
       } finally {
         setLoading(false);
       }
@@ -120,271 +128,265 @@ export default function PatientDashboardScreen({ navigation }) {
     return result;
   }, [patients, searchQuery, sortOrder]);
 
-  const renderPatientItem = ({ item }) => {
-    const isSelected = selectedPatientIds.includes(item.id);
-
-    const handleCardPress = () => {
-      if (isSelectionMode) {
-        if (isSelected) {
-          setSelectedPatientIds(prev => prev.filter(id => id !== item.id));
-        } else {
-          setSelectedPatientIds(prev => [...prev, item.id]);
-        }
-      } else {
-        navigation.navigate('PatientDetails', { patientId: item.id, patientData: item });
-      }
-    };
-
-    return (
-      <TouchableOpacity onPress={handleCardPress} activeOpacity={0.7}>
-        <ClayCard style={[styles.patientCard, isSelected && { borderColor: theme.colors.primary, borderWidth: 2 }]}>
-          <View style={styles.patientCardInner}>
-            <View style={styles.patientInfo}>
-              <Text style={styles.patientName}>{item.name}</Text>
-              <Text style={styles.patientPhone}>{item.phoneNumber}</Text>
-            </View>
-            <View style={styles.patientMeta}>
-              <Text style={styles.patientMetaText}>{item.gender}, {item.age} yrs</Text>
-              <Text style={styles.patientDate}>Joined: {new Date(item.createdAt || 0).toLocaleDateString()}</Text>
-            </View>
-            
-            {isSelectionMode ? (
-              <Ionicons 
-                name={isSelected ? "checkbox" : "square-outline"} 
-                size={24} 
-                color={isSelected ? theme.colors.primary : theme.colors.textLight} 
-                style={{ marginLeft: 8 }}
-              />
-            ) : (
-              <Ionicons name="chevron-forward" size={24} color={theme.colors.textLight} />
-            )}
-          </View>
-        </ClayCard>
-      </TouchableOpacity>
-    );
+  const toggleSelection = (e, id) => {
+    e.stopPropagation();
+    if (selectedPatientIds.includes(id)) {
+      setSelectedPatientIds(prev => prev.filter(pid => pid !== id));
+    } else {
+      setSelectedPatientIds(prev => [...prev, id]);
+    }
   };
 
-  return (
-    <View style={styles.container}>
-      {/* Top Header & Search */}
-      <View style={styles.headerRow}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by Name or Phone..."
-          placeholderTextColor="#666666"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={sortOrder}
-            onValueChange={setSortOrder}
-            style={styles.picker}
-          >
-            <Picker.Item label="Newest First" value="newest" />
-            <Picker.Item label="Oldest First" value="oldest" />
-          </Picker>
-        </View>
-        <ClayButton
-          title={isSelectionMode ? "Cancel Select" : "Delete..."}
-          variant={isSelectionMode ? "secondary" : "secondary"}
-          onPress={() => {
-            setIsSelectionMode(!isSelectionMode);
-            setSelectedPatientIds([]);
-          }}
-          style={styles.addBtn}
-        />
-        
-        {isSelectionMode && selectedPatientIds.length > 0 && (
-          <TouchableOpacity
-            style={{ backgroundColor: '#FF3B30', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, marginLeft: theme.spacing.sm, height: 48, justifyContent: 'center' }}
-            onPress={handleBatchDeletePatients}
-          >
-            <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Delete ({selectedPatientIds.length})</Text>
-          </TouchableOpacity>
-        )}
-
-        {!isSelectionMode && (
-          <ClayButton
-            title="+ Add Patient"
-            onPress={() => setAddModalVisible(true)}
-            style={{ marginLeft: theme.spacing.sm }}
-          />
-        )}
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>This highly styled component is optimized for Web only.</Text>
       </View>
+    );
+  }
 
-      {/* Directory List */}
-      {loading ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 40 }} />
-      ) : filteredPatients.length === 0 ? (
-        <Text style={styles.emptyText}>No patients found.</Text>
-      ) : (
-        <FlatList
-          data={filteredPatients}
-          keyExtractor={item => item.id}
-          renderItem={renderPatientItem}
-          contentContainerStyle={{ paddingBottom: 100 }}
-        />
-      )}
+
+
+  return (
+    <div className="flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white overflow-hidden font-sans">
+      
+      
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
+        
+        {/* Header Row */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 shrink-0">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Patient CRM</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage and organize your patient directory.</p>
+          </div>
+          <button 
+            onClick={() => setAddModalVisible(true)}
+            className="flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm outline-none shrink-0"
+          >
+            <Plus size={18} />
+            <span>Add Patient</span>
+          </button>
+        </header>
+
+        {/* Toolbar Row */}
+        <div className="flex flex-wrap items-center gap-4 mb-6 shrink-0 bg-white dark:bg-[#1E293B] p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+          
+          <div className="flex-1 min-w-[200px] relative">
+            <Search size={18} className="absolute left-3 top-3 text-gray-500 dark:text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="Search by Name or Phone..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+            />
+          </div>
+
+          <div className="w-40 relative">
+            <Filter size={16} className="absolute left-3 top-3 text-gray-500 dark:text-gray-400" />
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none cursor-pointer appearance-none transition-colors"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+          </div>
+
+          <button 
+            onClick={() => {
+              setIsSelectionMode(!isSelectionMode);
+              setSelectedPatientIds([]);
+            }}
+            className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${isSelectionMode ? 'bg-gray-200 dark:bg-gray-800 border-gray-600 text-gray-900 dark:text-white' : 'bg-transparent border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-800'}`}
+          >
+            {isSelectionMode ? 'Cancel Select' : 'Delete...'}
+          </button>
+
+          {isSelectionMode && selectedPatientIds.length > 0 && (
+            <button 
+              onClick={handleBatchDeletePatients}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-gray-900 dark:text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm"
+            >
+              <Trash2 size={16} />
+              <span>Delete ({selectedPatientIds.length})</span>
+            </button>
+          )}
+
+        </div>
+
+        {/* Patient Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+          {loading ? (
+            /* Skeleton Loaders */
+            [1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+              <div key={n} className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 flex flex-col animate-pulse">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-800 rounded-full" />
+                  <div className="w-6 h-6 bg-gray-200 dark:bg-gray-800 rounded-md" />
+                </div>
+                <div className="w-3/4 h-5 bg-gray-200 dark:bg-gray-800 rounded-md mb-2" />
+                <div className="w-1/2 h-4 bg-gray-200 dark:bg-gray-800 rounded-md mb-4" />
+                <div className="w-full h-10 bg-gray-200 dark:bg-gray-800 rounded-xl mt-auto" />
+              </div>
+            ))
+          ) : filteredPatients.length === 0 ? (
+            /* Empty State */
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+              <Users className="w-16 h-16 text-gray-400 dark:text-gray-700 mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-400">No Patients Found</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-600 mt-2">There is currently no data to display here.</p>
+            </div>
+          ) : (
+            filteredPatients.map(item => {
+              const isSelected = selectedPatientIds.includes(item.id);
+              
+              const handleCardClick = () => {
+                if (isSelectionMode) {
+                  toggleSelection({ stopPropagation: () => {} }, item.id);
+                } else {
+                  navigation.navigate('PatientDetails', { patientId: item.id, patientData: item });
+                }
+              };
+
+              return (
+                <div 
+                  key={item.id}
+                  onClick={handleCardClick}
+                  className={`bg-white dark:bg-[#1E293B] border rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg flex flex-col group ${
+                    isSelected ? 'border-yellow-400 ring-1 ring-yellow-400 bg-[#1e293b]/80' : 'border-gray-200 dark:border-gray-800 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0 group-hover:text-yellow-400 transition-colors">
+                      <Users size={20} />
+                    </div>
+                    
+                    {isSelectionMode ? (
+                      <button onClick={(e) => toggleSelection(e, item.id)} className="text-gray-500 dark:text-gray-400 hover:text-white transition-colors">
+                        {isSelected ? <CheckSquare size={22} className="text-yellow-400" /> : <Square size={22} />}
+                      </button>
+                    ) : (
+                      <ChevronRight size={20} className="text-gray-600 group-hover:text-white transition-colors" />
+                    )}
+                  </div>
+                  
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">{item.name}</h3>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mt-1 truncate">{item.phoneNumber}</p>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-800/50 flex flex-col gap-1">
+                    <p className="text-xs text-gray-500 font-medium">{item.gender}, {item.age} yrs</p>
+                    <p className="text-xs text-gray-600">Joined: {new Date(item.createdAt || 0).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+      </main>
 
       {/* Add Patient Modal */}
-      <Modal visible={isAddModalVisible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>Add New Patient</Text>
+      {isAddModalVisible && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-3xl p-6 shadow-2xl flex flex-col max-h-[90vh]">
+            
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Patient</h2>
+              <button 
+                onClick={() => setAddModalVisible(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[#0F172A] flex items-center justify-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              <Text style={styles.label}>Name</Text>
-              <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="e.g. Jane Doe" placeholderTextColor="#666666" />
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors"
+                />
+              </div>
 
-              <Text style={styles.label}>Phone Number (Unique ID)</Text>
-              <TextInput style={styles.input} value={newPhone} onChangeText={setNewPhone} placeholder="e.g. 9876543210" keyboardType="phone-pad" placeholderTextColor="#666666" />
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
+                <input 
+                  type="tel" 
+                  value={newPhone}
+                  onChange={e => setNewPhone(e.target.value)}
+                  placeholder="e.g. +1 234 567 8900"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors"
+                />
+              </div>
 
-              <Text style={styles.label}>Age</Text>
-              <TextInput style={styles.input} value={newAge} onChangeText={setNewAge} placeholder="e.g. 30" keyboardType="numeric" placeholderTextColor="#666666" />
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Age <span className="text-red-500">*</span></label>
+                  <input 
+                    type="number" 
+                    value={newAge}
+                    onChange={e => setNewAge(e.target.value)}
+                    placeholder="e.g. 35"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Gender</label>
+                  <select
+                    value={newGender}
+                    onChange={e => setNewGender(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors appearance-none"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
 
-              <Text style={styles.label}>Gender</Text>
-              <View style={[styles.input, { padding: 0, overflow: 'hidden' }]}>
-                <Picker selectedValue={newGender} onValueChange={setNewGender} style={{ height: '100%', width: '100%', color: '#000000', backgroundColor: '#FFFFFF' }}>
-                  <Picker.Item label="Male" value="Male" color="#000000" />
-                  <Picker.Item label="Female" value="Female" color="#000000" />
-                  <Picker.Item label="Other" value="Other" color="#000000" />
-                </Picker>
-              </View>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Medical History (Optional)</label>
+                <textarea 
+                  value={newHistory}
+                  onChange={e => setNewHistory(e.target.value)}
+                  placeholder="Any pre-existing conditions, allergies, etc."
+                  rows={4}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors resize-none"
+                />
+              </div>
+            </div>
 
-              <Text style={styles.label}>Medical History (Optional)</Text>
-              <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} value={newHistory} onChangeText={setNewHistory} multiline numberOfLines={3} placeholder="Any known allergies, past surgeries..." placeholderTextColor="#666666" />
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 shrink-0">
+              <button 
+                onClick={() => setAddModalVisible(false)}
+                className="px-6 py-3 rounded-xl font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#0F172A] transition-colors"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleAddPatient}
+                className="px-6 py-3 rounded-xl font-bold bg-yellow-400 text-yellow-950 hover:bg-yellow-500 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[120px]"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Add Patient'}
+              </button>
+            </div>
 
-              <ClayButton title="Save Patient" onPress={handleAddPatient} loading={isSubmitting} style={{ marginTop: 20 }} />
-              <ClayButton title="Cancel" variant="secondary" onPress={() => setAddModalVisible(false)} style={{ marginTop: 10 }} />
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          </div>
+        </div>
+      )}
 
-    </View>
+    </div>
   );
 }
-
-const getStyles = (theme, isDarkMode) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.lg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  searchInput: {
-    flex: 2,
-    minWidth: 200,
-    backgroundColor: '#FFFFFF',
-    color: '#000000',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  pickerWrapper: {
-    flex: 1,
-    minWidth: 150,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: 'hidden',
-    height: 48,
-    justifyContent: 'center',
-  },
-  picker: {
-    width: '100%',
-    height: '100%',
-    color: '#000000',
-    backgroundColor: '#FFFFFF',
-  },
-  addBtn: {
-    marginLeft: 'auto',
-  },
-  emptyText: {
-    color: theme.colors.textLight,
-    textAlign: 'center',
-    marginTop: 40,
-    fontSize: 16,
-  },
-  patientCard: {
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
-  },
-  patientCardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  patientInfo: {
-    flex: 2,
-  },
-  patientName: {
-    ...theme.typography.title,
-    fontSize: 18,
-    color: isDarkMode ? '#FFFFFF' : theme.colors.text,
-  },
-  patientPhone: {
-    ...theme.typography.body,
-    color: theme.colors.textLight,
-    marginTop: 4,
-  },
-  patientMeta: {
-    flex: 1,
-    alignItems: 'flex-end',
-    marginRight: theme.spacing.md,
-  },
-  patientMetaText: {
-    ...theme.typography.body,
-    color: theme.colors.text,
-  },
-  patientDate: {
-    ...theme.typography.body,
-    fontSize: 12,
-    color: theme.colors.textLight,
-    marginTop: 4,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
-  },
-  modalContent: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.xl,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    ...theme.typography.header,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.lg,
-    textAlign: 'center',
-  },
-  label: {
-    ...theme.typography.title,
-    fontSize: 14,
-    color: theme.colors.text,
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.xs,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    backgroundColor: '#FFFFFF',
-    color: '#000000',
-    height: 48, // Consistent height for inputs and pickers
-  }
-});
