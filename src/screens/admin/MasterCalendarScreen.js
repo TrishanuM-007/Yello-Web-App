@@ -26,6 +26,13 @@ const sendWhatsAppMessage = (phone, message) => {
   window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
 };
 
+const getLocalDateString = (dateObj) => {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`; 
+};
+
 export default function MasterCalendarScreen() {
   const { isDarkMode } = useTheme();
 
@@ -121,7 +128,7 @@ export default function MasterCalendarScreen() {
   // Fetch Slots for Selected Doctor and Date
   useEffect(() => {
     if (!selectedDoctorId) return;
-    const dateString = selectedDate.toISOString().split('T')[0];
+    const dateString = getLocalDateString(selectedDate);
     const slotsQuery = query(
       collection(db, 'available_slots'),
       where('doctorId', '==', selectedDoctorId),
@@ -272,7 +279,7 @@ export default function MasterCalendarScreen() {
     };
 
     const timeString = `${formatAmPm(targetHour, targetMinute)} - ${formatAmPm(endHour, endMinute)}`;
-    const dateString = selectedDate.toISOString().split('T')[0];
+    const dateString = getLocalDateString(selectedDate);
 
     const dummyStart = new Date(`${dateString}T00:00:00`);
     dummyStart.setHours(targetHour, targetMinute, 0, 0);
@@ -510,7 +517,7 @@ export default function MasterCalendarScreen() {
 
               {daysToRender.map((dateObj, i) => {
                 if (!dateObj) return <div key={i} />; // padding
-                const isSelected = dateObj.toISOString().split('T')[0] === selectedDate.toISOString().split('T')[0];
+                const isSelected = getLocalDateString(dateObj) === getLocalDateString(selectedDate);
                 return (
                   <div
                     key={i}
