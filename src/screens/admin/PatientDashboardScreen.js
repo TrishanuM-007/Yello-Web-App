@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../config/firebase';
 import { collection, onSnapshot, doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { formatDate } from '../../utils/dateUtils';
 import { 
   Search, Users, Plus, Trash2, CheckSquare, Square, Menu, X, ChevronRight, Filter
 } from 'lucide-react';
@@ -22,6 +23,7 @@ export default function PatientDashboardScreen({ navigation }) {
   // Add Patient Modal State
   const [isAddModalVisible, setAddModalVisible] = useState(false);
   const [newName, setNewName] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
   const [newPhone, setNewPhone] = useState('');
   const [newAge, setNewAge] = useState('');
   const [newGender, setNewGender] = useState('Male');
@@ -56,7 +58,7 @@ export default function PatientDashboardScreen({ navigation }) {
       return;
     }
 
-    const phoneId = newPhone.trim().replace(/\s+/g, '');
+    const phoneId = `${countryCode} ${newPhone.trim()}`.replace(/\s+/g, '');
     
     setIsSubmitting(true);
     try {
@@ -281,7 +283,7 @@ export default function PatientDashboardScreen({ navigation }) {
                   
                   <div className="mt-4 pt-4 border-t border-gray-800/50 flex flex-col gap-1">
                     <p className="text-xs text-gray-500 font-medium">{item.gender}, {item.age} yrs</p>
-                    <p className="text-xs text-gray-600">Joined: {new Date(item.createdAt || 0).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-600">Joined: {formatDate(item.createdAt || 0)}</p>
                   </div>
                 </div>
               );
@@ -320,13 +322,26 @@ export default function PatientDashboardScreen({ navigation }) {
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
-                <input 
-                  type="tel" 
-                  value={newPhone}
-                  onChange={e => setNewPhone(e.target.value)}
-                  placeholder="e.g. +1 234 567 8900"
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors"
-                />
+                <div className="flex gap-2">
+                  <select
+                    value={countryCode}
+                    onChange={e => setCountryCode(e.target.value)}
+                    className="px-3 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors w-24"
+                  >
+                    <option value="+91">+91 (IN)</option>
+                    <option value="+1">+1 (US/CA)</option>
+                    <option value="+44">+44 (UK)</option>
+                    <option value="+61">+61 (AU)</option>
+                    <option value="+971">+971 (AE)</option>
+                  </select>
+                  <input 
+                    type="tel" 
+                    value={newPhone}
+                    onChange={e => setNewPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors"
+                  />
+                </div>
               </div>
 
               <div className="flex gap-4">

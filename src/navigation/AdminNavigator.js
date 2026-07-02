@@ -88,7 +88,7 @@ function CustomDrawerContent(props) {
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:relative md:translate-x-0 bg-gray-50 dark:bg-[#0F172A] border-r border-gray-200 dark:border-gray-800 pt-8 flex flex-col font-sans ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 h-full transform transition-transform duration-300 md:relative md:translate-x-0 bg-gray-50 dark:bg-[#0F172A] border-r border-gray-200 dark:border-gray-800 pt-8 flex flex-col font-sans ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       
       {/* Brand Header */}
       <div className="px-6 mb-8 flex items-center gap-3 shrink-0">

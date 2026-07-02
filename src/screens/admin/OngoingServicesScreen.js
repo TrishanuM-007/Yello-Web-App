@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../config/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { Menu, Activity, CalendarClock, CheckCircle, ChevronRight, Stethoscope } from 'lucide-react';
+import { Activity, Clock, FileText, UploadCloud, ChevronRight, CheckCircle, Search, User, Filter, AlertCircle, Eye, Phone, Menu, CalendarClock, Stethoscope } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 import { Platform, View, Text } from 'react-native';
 import toast from 'react-hot-toast';
 
@@ -172,7 +173,7 @@ export default function OngoingServicesScreen() {
       toast.success('Service marked as completed!');
 
       if (patientPhone) {
-        let reviewMsg = messageSettings.feedbackTemplate || `Thank You for Visiting/Choosing YelloMedi [patient_name], please leave a review here: https://g.page/review/...`;
+        let reviewMsg = messageSettings.feedbackTemplate || `Hi [patient_name]!\n\nThanks for visiting Yello Clinics and Diagnostics, Kokapet.\n\nIf your visit brought you comfort, a kind 5-star review would mean the world — and help others find the care they need too.\n\nReview here 💛 https://tinyurl.com/wrbr3mpd`;
         reviewMsg = reviewMsg.replace(/\[patient_name\]/g, patientName || 'Patient')
                              .replace(/\[link\]/g, 'https://g.page/review/...');
                              
@@ -270,7 +271,7 @@ export default function OngoingServicesScreen() {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 dark:text-white">Dr. {item.doctorName}</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.date} at {item.time}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(item.date)} at {item.time}</p>
                     </div>
                   </div>
                   

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../config/firebase';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { X, Search } from 'lucide-react';
+import { formatDate } from '../utils/dateUtils';
 
 export default function DoctorBookingModal({ isVisible, onClose, selectedDoctor, initialSlotId }) {
   const [patients, setPatients] = useState([]);
@@ -123,7 +124,7 @@ export default function DoctorBookingModal({ isVisible, onClose, selectedDoctor,
               <option value="" disabled>Choose a time slot...</option>
               {selectedDoctor?.availableSlots?.map(slot => (
                 <option key={slot.id} value={slot.id}>
-                  {slot.date} at {slot.time}
+                  {formatDate(slot.date)} at {slot.time}
                 </option>
               ))}
             </select>

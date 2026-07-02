@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../config/firebase';
-import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import { Menu, CalendarPlus, Trash2, CalendarDays, CheckCircle, Clock, CheckSquare, Square, ChevronLeft } from 'lucide-react';
+import { collection, addDoc, onSnapshot, query, where, deleteDoc, doc, getDocs, updateDoc, writeBatch } from 'firebase/firestore';
+import { Menu, CalendarPlus, Trash2, CalendarDays, CheckCircle, Clock, CheckSquare, Square, ChevronLeft, Edit3, X, Save } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 import { Platform, View, Text } from 'react-native';
 
 export default function DoctorSlotsAdminScreen({ route, navigation }) {
   const { isDarkMode } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { doctor } = route?.params || {};
+  const { doctor: initialDoctor } = route?.params || {};
+  const [currentDoctor, setCurrentDoctor] = useState(initialDoctor);
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [slotDuration, setSlotDuration] = useState(15);
+  const [minStartDate, setMinStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [shiftStart, setShiftStart] = useState('09:00');
   const [shiftEnd, setShiftEnd] = useState('17:00');
   const [generatedSlots, setGeneratedSlots] = useState([]);
@@ -23,6 +28,34 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedSlotIds, setSelectedSlotIds] = useState([]);
 
+  const getInitialCountryCode = (contact) => {
+    if (!contact) return '+91';
+    const match = contact.match(/^(\+\d+)\s(.*)$/);
+    if (match) return match[1];
+    if (contact.startsWith('+')) {
+       const parts = contact.split(' ');
+       if (parts.length > 1) return parts[0];
+    }
+    return '+91';
+  };
+
+  const getInitialPhoneNumber = (contact) => {
+    if (!contact) return '';
+    const match = contact.match(/^(\+\d+)\s(.*)$/);
+    if (match) return match[2];
+    return contact;
+  };
+
+  // Edit Doctor State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState(initialDoctor?.name || '');
+  const [editSpecialty, setEditSpecialty] = useState(initialDoctor?.specialty || '');
+  const [editExperience, setEditExperience] = useState(initialDoctor?.experience || '');
+  const [editCountryCode, setEditCountryCode] = useState(() => getInitialCountryCode(initialDoctor?.contactNumber));
+  const [editContact, setEditContact] = useState(() => getInitialPhoneNumber(initialDoctor?.contactNumber));
+  const [editDescription, setEditDescription] = useState(initialDoctor?.description || '');
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+
   useEffect(() => {
     if (Platform.OS === 'web' && !document.getElementById('tailwind-cdn')) {
       const script = document.createElement('script');
@@ -33,12 +66,12 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
-    if (!doctor || !doctor.id) {
+    if (!currentDoctor || !currentDoctor.id) {
       setLoadingSlots(false);
       return;
     }
     
-    const simpleQ = query(collection(db, 'available_slots'), where('doctorId', '==', doctor.id));
+    const simpleQ = query(collection(db, 'available_slots'), where('doctorId', '==', currentDoctor.id));
 
     const unsubscribe = onSnapshot(simpleQ, (snapshot) => {
       const slotsList = snapshot.docs.map(doc => ({
@@ -60,22 +93,61 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
     });
 
     return () => unsubscribe();
-  }, [doctor]);
+  }, [currentDoctor.id]);
+
+  useEffect(() => {
+    if (slots.length > 0) {
+      const lastSlot = slots[slots.length - 1];
+      const maxDate = new Date(lastSlot.date);
+      maxDate.setDate(maxDate.getDate() + 1);
+      const nextDayStr = maxDate.toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      const computedMin = nextDayStr > todayStr ? nextDayStr : todayStr;
+      setMinStartDate(computedMin);
+      
+      setStartDate(prev => prev < computedMin ? computedMin : prev);
+      setEndDate(prev => prev < computedMin ? computedMin : prev);
+    } else {
+      const todayStr = new Date().toISOString().split('T')[0];
+      setMinStartDate(todayStr);
+    }
+  }, [slots]);
 
   const handlePreviewSlots = () => {
-    const startDateTime = new Date(`${date}T${shiftStart}:00`);
-    const endDateTime = new Date(`${date}T${shiftEnd}:00`);
-
-    if (endDateTime <= startDateTime) {
-      window.alert('Invalid Time: Shift end must be after shift start.');
+    if (endDate < startDate) {
+      window.alert('Error: End Date must be greater than or equal to Start Date.');
       return;
     }
+    
     const tempSlots = [];
-    let current = startDateTime;
-    while (current < endDateTime) {
-      tempSlots.push(new Date(current));
-      current.setMinutes(current.getMinutes() + 15);
+    
+    // Loop through each day from startDate to endDate (inclusive)
+    let currentDay = new Date(startDate);
+    const lastDay = new Date(endDate);
+    
+    while (currentDay <= lastDay) {
+      const dateStr = currentDay.toISOString().split('T')[0];
+      
+      const startDateTime = new Date(`${dateStr}T${shiftStart}:00`);
+      const endDateTime = new Date(`${dateStr}T${shiftEnd}:00`);
+
+      if (endDateTime > startDateTime) {
+        let current = startDateTime;
+        while (current < endDateTime) {
+          tempSlots.push(new Date(current));
+          current.setMinutes(current.getMinutes() + Number(slotDuration));
+        }
+      }
+      
+      currentDay.setDate(currentDay.getDate() + 1);
     }
+    
+    if (tempSlots.length === 0) {
+      window.alert('No valid slots could be generated with the given times.');
+      return;
+    }
+    
     setGeneratedSlots(tempSlots);
   };
 
@@ -87,26 +159,31 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
 
     setAddingSlot(true);
     try {
-      const dateString = date;
-
+      const batch = writeBatch(db);
+      
       for (const slot of generatedSlots) {
+        const dateString = slot.toISOString().split('T')[0];
         const startStr = slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
-        const endSlot = new Date(slot.getTime() + 15 * 60000);
+        const endSlot = new Date(slot.getTime() + Number(slotDuration) * 60000);
         const endStr = endSlot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
         
         const slotData = {
-          doctorId: doctor.id,
-          doctorName: doctor.name,
-          specialty: doctor.specialty,
+          doctorId: currentDoctor.id,
+          doctorName: currentDoctor.name,
+          specialty: currentDoctor.specialty,
           date: dateString,
           time: `${startStr} - ${endStr}`,
           isBooked: false,
           createdAt: new Date().toISOString()
         };
-        await addDoc(collection(db, 'available_slots'), slotData);
+        
+        const slotRef = doc(collection(db, 'available_slots'));
+        batch.set(slotRef, slotData);
       }
+      
+      await batch.commit();
 
-      window.alert(`Success: ${generatedSlots.length} slots added successfully!`);
+      window.alert(`Success: ${generatedSlots.length} slots published successfully!`);
       setGeneratedSlots([]);
     } catch (error) {
       console.error('Error adding slots:', error);
@@ -116,28 +193,70 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
     }
   };
 
-  const handleDeleteDoctor = () => {
-    if (window.confirm(`Delete Doctor: Are you sure you want to delete ${doctor.name}? This will also delete all their slots.`)) {
-      (async () => {
-        try {
-          const slotsQuery = query(collection(db, 'available_slots'), where('doctorId', '==', doctor.id));
-          const slotsSnapshot = await getDocs(slotsQuery);
-          const batchPromises = slotsSnapshot.docs.map(slotDoc => deleteDoc(doc(db, 'available_slots', slotDoc.id)));
-          await Promise.all(batchPromises);
+  const handleDeleteDoctor = async () => {
+    if (window.confirm(`Delete Doctor: Are you sure you want to delete ${currentDoctor.name}? This will also delete all their slots.`)) {
+      try {
+        const batch = writeBatch(db);
+        const slotsQuery = query(collection(db, 'available_slots'), where('doctorId', '==', currentDoctor.id));
+        const slotsSnap = await getDocs(slotsQuery);
+        slotsSnap.forEach(docSnap => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+        await deleteDoc(doc(db, 'doctors', currentDoctor.id));
+        window.alert('Success: Doctor and their slots deleted.');
+        navigation?.goBack();
+      } catch (error) {
+        console.error('Error deleting doctor:', error);
+        window.alert('Error: Failed to delete doctor.');
+      }
+    }
+  };
 
-          await deleteDoc(doc(db, 'doctors', doctor.id));
+  const handleUpdateProfile = async () => {
+    if (!currentDoctor || !currentDoctor.id) return;
+    if (!editName.trim() || !editSpecialty.trim()) {
+      window.alert('Error: Name and Specialty are required.');
+      return;
+    }
+    
+    setUpdatingProfile(true);
+    try {
+      const cleanName = editName.trim();
+      const cleanSpec = editSpecialty.trim();
 
-          window.alert('Success: Doctor deleted successfully.');
-          if (navigation?.goBack) {
-            navigation.goBack();
-          } else {
-            window.location.reload();
-          }
-        } catch (error) {
-          console.error('Error deleting doctor:', error);
-          window.alert('Error: Failed to delete doctor.');
-        }
-      })();
+      // 1. Update doctor document
+      const docRef = doc(db, 'doctors', currentDoctor.id);
+      const newDocData = {
+        name: cleanName,
+        specialty: cleanSpec,
+        experience: parseInt(editExperience) || 0,
+        contactNumber: `${editCountryCode} ${editContact.trim()}`,
+        description: editDescription.trim()
+      };
+      await updateDoc(docRef, newDocData);
+
+      // 2. Batch update slots to keep denormalized data consistent
+      const slotsQ = query(collection(db, 'available_slots'), where('doctorId', '==', currentDoctor.id));
+      const slotsSnap = await getDocs(slotsQ);
+      
+      const batch = writeBatch(db);
+      slotsSnap.docs.forEach(dSnap => {
+        batch.update(dSnap.ref, {
+          doctorName: cleanName,
+          specialty: cleanSpec
+        });
+      });
+      await batch.commit();
+
+      setCurrentDoctor(prev => ({ ...prev, ...newDocData }));
+      setIsEditingProfile(false);
+      window.alert('Success: Doctor Profile Updated!');
+    } catch (e) {
+      console.error(e);
+      window.alert('Error: Failed to update profile.');
+    } finally {
+      setUpdatingProfile(false);
     }
   };
 
@@ -184,7 +303,7 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
     );
   }
 
-  if (!doctor) {
+  if (!currentDoctor) {
     return (
       <div className="flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] items-center justify-center text-gray-900 dark:text-white font-sans">
         <p>No doctor provided. Please navigate from the Doctors list.</p>
@@ -195,8 +314,6 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
   return (
     <div className={`flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white ${isDarkMode ? 'dark' : ''}  overflow-hidden font-sans`}>
       
-      
-
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
         
@@ -209,18 +326,26 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-                {doctor.name}
+                {currentDoctor.name}
               </h1>
-              <p className="text-yellow-400 font-bold mt-1 text-sm">{doctor.specialty} • {doctor.experience} yrs exp</p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{doctor.contactNumber}</p>
+              <p className="text-yellow-400 font-bold mt-1 text-sm">{currentDoctor.specialty} • {currentDoctor.experience} yrs exp</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{currentDoctor.contactNumber}</p>
             </div>
             
-            <button 
-              onClick={handleDeleteDoctor}
-              className="px-6 py-2.5 rounded-lg font-bold text-sm bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 shrink-0"
-            >
-              <Trash2 size={16} /> Delete Doctor
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button 
+                onClick={() => setIsEditingProfile(true)}
+                className="px-6 py-2.5 rounded-lg font-bold text-sm bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700 transition-all flex items-center gap-2 shrink-0"
+              >
+                <Edit3 size={16} /> Edit Doctor
+              </button>
+              <button 
+                onClick={handleDeleteDoctor}
+                className="px-6 py-2.5 rounded-lg font-bold text-sm bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 shrink-0"
+              >
+                <Trash2 size={16} /> Delete Doctor
+              </button>
+            </div>
           </div>
         </header>
 
@@ -237,46 +362,75 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
                 <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">Generate bulk shifts</p>
               </div>
               
-              <div className="flex-1 flex flex-col md:flex-row gap-5 w-full items-end">
-                <div className="flex-1 flex flex-col gap-2 w-full">
-                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Target Date</label>
-                  <input 
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
-                  />
-                </div>
-
-                <div className="flex-1 flex flex-col gap-2 w-full md:col-span-2">
-                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Shift Timing (15m intervals)</label>
-                  <div className="flex items-center gap-3">
+              <div className="flex-1 w-full flex flex-col gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Start Date</label>
                     <input 
-                      type="time" 
+                      type="date"
                       required
-                      value={shiftStart} 
-                      onChange={(e) => setShiftStart(e.target.value)} 
-                      className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
-                    />
-                    <span className="text-gray-500 font-medium">to</span>
-                    <input 
-                      type="time" 
-                      required
-                      value={shiftEnd} 
-                      onChange={(e) => setShiftEnd(e.target.value)} 
-                      className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+                      min={minStartDate}
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                     />
                   </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">End Date</label>
+                    <input 
+                      type="date"
+                      required
+                      min={startDate}
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Duration</label>
+                    <select
+                      value={slotDuration}
+                      onChange={(e) => setSlotDuration(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors appearance-none"
+                    >
+                      <option value={15}>15 mins</option>
+                      <option value={30}>30 mins</option>
+                      <option value={60}>60 mins</option>
+                    </select>
+                  </div>
                 </div>
-                
-                <button
-                  type="button"
-                  onClick={handlePreviewSlots}
-                  className="w-full md:w-auto shrink-0 px-6 py-3.5 rounded-xl font-bold text-sm bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-700 transition-all border border-gray-300 dark:border-gray-700"
-                >
-                  Preview
-                </button>
+
+                <div className="flex flex-col md:flex-row gap-5 items-end">
+                  <div className="flex-1 flex flex-col gap-2 w-full">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Shift Timing</label>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="time" 
+                        required
+                        value={shiftStart} 
+                        onChange={(e) => setShiftStart(e.target.value)} 
+                        className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+                      />
+                      <span className="text-gray-500 font-medium">to</span>
+                      <input 
+                        type="time" 
+                        required
+                        value={shiftEnd} 
+                        onChange={(e) => setShiftEnd(e.target.value)} 
+                        className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+                      />
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handlePreviewSlots}
+                    className="w-full md:w-auto shrink-0 px-8 py-3.5 rounded-xl font-bold text-sm bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700 transition-all border border-gray-300 dark:border-gray-700 whitespace-nowrap"
+                  >
+                    Preview
+                  </button>
+                </div>
               </div>
 
               {generatedSlots.length > 0 && (
@@ -354,7 +508,7 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
                       } ${isSelected ? 'border-yellow-400 bg-yellow-400/5' : 'border-gray-200 dark:border-gray-800'}`}
                     >
                       <div>
-                        <p className="text-gray-900 dark:text-white font-bold">{slot.date}</p>
+                        <p className="text-gray-900 dark:text-white font-bold">{formatDate(slot.date)}</p>
                         <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 flex items-center gap-1.5"><Clock size={12}/> {slot.time}</p>
                       </div>
                       
@@ -380,7 +534,80 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
         </div>
       </main>
 
-      
+      {/* Edit Doctor Modal */}
+      {isEditingProfile && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !updatingProfile && setIsEditingProfile(false)} />
+          <div className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-3xl p-6 md:p-8 shadow-2xl relative w-full max-w-2xl flex flex-col gap-6 z-10 max-h-full overflow-y-auto">
+            
+            <div className="flex justify-between items-center pb-4 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <Edit3 className="text-yellow-400" size={24} /> Edit Doctor Profile
+              </h2>
+              <button 
+                onClick={() => setIsEditingProfile(false)}
+                disabled={updatingProfile}
+                className="p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col md:flex-row gap-5">
+                <div className="flex-1 flex flex-col gap-2">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Name</label>
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Specialty</label>
+                  <input type="text" value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-5">
+                <div className="flex-1 flex flex-col gap-2">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Experience (Years)</label>
+                  <input type="number" value={editExperience} onChange={(e) => setEditExperience(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Contact Number</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={editCountryCode}
+                      onChange={(e) => setEditCountryCode(e.target.value)}
+                      className="px-3 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors w-24"
+                    >
+                      <option value="+91">+91 (IN)</option>
+                      <option value="+1">+1 (US/CA)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+61">+61 (AU)</option>
+                      <option value="+971">+971 (AE)</option>
+                    </select>
+                    <input type="tel" value={editContact} onChange={(e) => setEditContact(e.target.value)} className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">About / Description</label>
+                <textarea rows="4" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors resize-none"></textarea>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleUpdateProfile}
+              disabled={updatingProfile}
+              className={`w-full py-4 mt-2 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all ${updatingProfile ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 shadow-[0_4px_15px_rgb(250,204,21,0.2)] hover:shadow-[0_6px_20px_rgb(250,204,21,0.3)] hover:-translate-y-0.5'}`}
+            >
+              <Save size={20} /> {updatingProfile ? 'Saving Changes...' : 'Save Profile Changes'}
+            </button>
+
+          </div>
+        </div>
+      )}
+
   </div>
     );
 }

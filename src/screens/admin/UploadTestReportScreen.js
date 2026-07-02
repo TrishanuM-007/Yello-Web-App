@@ -138,7 +138,7 @@ export default function UploadTestReportScreen() {
           {/* Header Row */}
           <header className="flex flex-col gap-2 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6 text-center">
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Brand PDF Reports</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Upload a raw lab report to inject Yello Clinics branding and headers automatically.</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Upload a raw lab report to inject your clinic's branding and headers automatically.</p>
           </header>
 
           <input

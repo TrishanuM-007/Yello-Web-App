@@ -3,6 +3,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { ArrowLeft, User, Phone, Calendar, Stethoscope, Clock, FileText, Activity } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 import { Platform, View, Text } from 'react-native';
 
 export default function PatientDetailsScreen({ route, navigation }) {
@@ -126,7 +127,7 @@ export default function PatientDetailsScreen({ route, navigation }) {
                  </div>
                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#0F172A] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                    <Calendar size={14} className="text-yellow-500" />
-                   Joined: {new Date(patientData.createdAt || 0).toLocaleDateString()}
+                   Joined: {formatDate(patientData.createdAt || 0)}
                  </div>
                </div>
              </div>
@@ -161,7 +162,7 @@ export default function PatientDetailsScreen({ route, navigation }) {
               <div className="relative border-l-2 border-gray-200 dark:border-gray-800 ml-4 space-y-8 pb-10">
                 {history.map((item, index) => {
                   const isAppt = item.type === 'appointment';
-                  const dateStr = item.date || item.requestedDate || new Date(item.createdAt || 0).toLocaleDateString();
+                  const dateStr = item.date ? formatDate(item.date) : (item.requestedDate ? formatDate(item.requestedDate) : formatDate(item.createdAt || 0));
                   
                   return (
                     <div key={item.id} className="relative pl-8">

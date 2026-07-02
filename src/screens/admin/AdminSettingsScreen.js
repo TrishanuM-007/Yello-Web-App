@@ -10,8 +10,8 @@ export default function AdminSettingsScreen({ navigation }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { theme, isDarkMode, toggleTheme } = useTheme();
   
-  const [bookingTemplate, setBookingTemplate] = useState('A booking at [time] on [date] has been scheduled with [patient_name].');
-  const [feedbackTemplate, setFeedbackTemplate] = useState('Thank You for Visiting YelloMedi [patient_name], please leave a review here: [link]');
+  const [bookingTemplate, setBookingTemplate] = useState('Hello Doctor,\n\nYou have a new booking scheduled at [time] on [date] with patient [patient_name].\n\nThank you!');
+  const [feedbackTemplate, setFeedbackTemplate] = useState('Hi [patient_name]!\n\nThanks for visiting Yello Clinics and Diagnostics, Kokapet.\n\nIf your visit brought you comfort, a kind 5-star review would mean the world — and help others find the care they need too.\n\nReview here 💛 https://tinyurl.com/wrbr3mpd');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function AdminSettingsScreen({ navigation }) {
                   value={bookingTemplate}
                   onChange={(e) => setBookingTemplate(e.target.value)}
                   className="w-full min-h-[100px] p-4 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors resize-y"
-                  placeholder="A booking at [time] on [date] has been scheduled with [patient_name]."
+                  placeholder="Hello Doctor,\n\nYou have a new booking scheduled at [time] on [date] with patient [patient_name].\n\nThank you!"
                 />
               </div>
 
@@ -143,7 +143,7 @@ export default function AdminSettingsScreen({ navigation }) {
                   value={feedbackTemplate}
                   onChange={(e) => setFeedbackTemplate(e.target.value)}
                   className="w-full min-h-[100px] p-4 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors resize-y"
-                  placeholder="Thank You for Visiting YelloMedi [patient_name], please leave a review here: [link]"
+                  placeholder="Hi [patient_name]!\n\nThanks for visiting Yello Clinics and Diagnostics, Kokapet."
                 />
               </div>
 

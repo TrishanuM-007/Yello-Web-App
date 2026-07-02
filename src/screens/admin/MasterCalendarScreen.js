@@ -5,6 +5,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2,
   Clock, Plus, Search, UserCircle, Trash2, Moon, Sun, X, Calendar, Activity, Phone, FileText
 } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 import { Platform, View, Text } from 'react-native';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
@@ -332,9 +333,9 @@ export default function MasterCalendarScreen() {
         whatsappTab.close();
         toast.error("No valid phone number found for this doctor.");
       } else {
-        let docMsg = messageSettings.bookingTemplate || `A booking at [time] on [date] has been scheduled with [patient_name].`;
+        let docMsg = messageSettings.bookingTemplate || `Hello Doctor,\n\nYou have a new booking scheduled at [time] on [date] with patient [patient_name].\n\nThank you!`;
         docMsg = docMsg.replace(/\[time\]/g, slotToBook.time)
-                       .replace(/\[date\]/g, slotToBook.date)
+                       .replace(/\[date\]/g, formatDate(slotToBook.date))
                        .replace(/\[patient_name\]/g, p?.name || 'Unknown Patient');
                        
         const cleanPhone = doctorPhone.replace(/\D/g, '');
@@ -363,7 +364,7 @@ export default function MasterCalendarScreen() {
       // Task B: Patient Checkout Review
       if (selectedBookedSlot && selectedBookedSlot.patientPhone) {
         const pPhone = selectedBookedSlot.patientPhone;
-        let reviewMsg = messageSettings.feedbackTemplate || `Thank You for Visiting/Choosing YelloMedi [patient_name], please leave a review here: https://g.page/review/...`;
+        let reviewMsg = messageSettings.feedbackTemplate || `Hi [patient_name]!\n\nThanks for visiting Yello Clinics and Diagnostics, Kokapet.\n\nIf your visit brought you comfort, a kind 5-star review would mean the world — and help others find the care they need too.\n\nReview here 💛 https://tinyurl.com/wrbr3mpd`;
         reviewMsg = reviewMsg.replace(/\[patient_name\]/g, selectedBookedSlot.patientName || 'Patient')
                              .replace(/\[link\]/g, 'https://g.page/review/...');
         
@@ -736,7 +737,7 @@ export default function MasterCalendarScreen() {
                 {slotToBook ? (
                   <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-xl flex items-center gap-3">
                     <Calendar size={18} className="text-yellow-600 dark:text-yellow-500" />
-                    <span className="text-sm font-bold text-yellow-900 dark:text-yellow-500">{slotToBook.date} at {slotToBook.time}</span>
+                    <span className="text-sm font-bold text-yellow-900 dark:text-yellow-500">{formatDate(slotToBook.date)} at {slotToBook.time}</span>
                   </div>
                 ) : (
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-xl text-sm font-medium text-red-700 dark:text-red-400">
@@ -829,7 +830,7 @@ export default function MasterCalendarScreen() {
                     <Clock size={18} />
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900 dark:text-yellow-500">{selectedBookedSlot.date}</p>
+                    <p className="font-bold text-gray-900 dark:text-yellow-500">{formatDate(selectedBookedSlot.date)}</p>
                     <p className="text-sm text-gray-600 dark:text-yellow-600/80 font-medium">{selectedBookedSlot.time}</p>
                   </div>
                 </div>
@@ -846,7 +847,7 @@ export default function MasterCalendarScreen() {
                           <Activity size={16} className="text-gray-500 dark:text-gray-400" />
                           <div>
                             <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{tr.testName || 'Lab Test'}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500">{new Date(tr.timestamp).toLocaleDateString()}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">{formatDate(tr.timestamp)}</p>
                           </div>
                         </div>
                       ))

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../config/firebase';
-import { collection, addDoc, getDocs, query } from 'firebase/firestore';
-import { Menu, CalendarDays, CheckCircle, Clock } from 'lucide-react';
+import { collection, addDoc, getDocs, query, doc, updateDoc, writeBatch, where } from 'firebase/firestore';
+import { Menu, CalendarDays, CheckCircle, Clock, UserCog, Save } from 'lucide-react';
 import { Platform, View, Text } from 'react-native';
+import toast from 'react-hot-toast';
 
 export default function ManageDoctorSlotsScreen() {
   const { isDarkMode } = useTheme();
@@ -20,6 +21,34 @@ export default function ManageDoctorSlotsScreen() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
 
+  const getInitialCountryCode = (contact) => {
+    if (!contact) return '+91';
+    const match = contact.match(/^(\+\d+)\s(.*)$/);
+    if (match) return match[1];
+    if (contact.startsWith('+')) {
+       const parts = contact.split(' ');
+       if (parts.length > 1) return parts[0];
+    }
+    return '+91';
+  };
+
+  const getInitialPhoneNumber = (contact) => {
+    if (!contact) return '';
+    const match = contact.match(/^(\+\d+)\s(.*)$/);
+    if (match) return match[2];
+    return contact;
+  };
+
+  // Edit State
+  const [activeTab, setActiveTab] = useState('slots'); // 'slots' | 'edit'
+  const [editName, setEditName] = useState('');
+  const [editSpecialty, setEditSpecialty] = useState('');
+  const [editExperience, setEditExperience] = useState('');
+  const [editCountryCode, setEditCountryCode] = useState('+91');
+  const [editContact, setEditContact] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [updating, setUpdating] = useState(false);
+
   useEffect(() => {
     if (Platform.OS === 'web' && !document.getElementById('tailwind-cdn')) {
       const script = document.createElement('script');
@@ -32,6 +61,20 @@ export default function ManageDoctorSlotsScreen() {
   useEffect(() => {
     fetchDoctors();
   }, []);
+
+  useEffect(() => {
+    if (selectedDoctorId && doctors.length > 0) {
+      const selectedDoc = doctors.find(d => d.id === selectedDoctorId);
+      if (selectedDoc) {
+        setEditName(selectedDoc.name || '');
+        setEditSpecialty(selectedDoc.specialty || '');
+        setEditExperience(selectedDoc.experience || '');
+        setEditCountryCode(getInitialCountryCode(selectedDoc.contactNumber));
+        setEditContact(getInitialPhoneNumber(selectedDoc.contactNumber));
+        setEditDescription(selectedDoc.description || '');
+      }
+    }
+  }, [selectedDoctorId, doctors]);
 
   const fetchDoctors = async () => {
     try {
@@ -111,6 +154,51 @@ export default function ManageDoctorSlotsScreen() {
     }
   };
 
+  const handleUpdateProfile = async () => {
+    if (!selectedDoctorId) return;
+    if (!editName.trim() || !editSpecialty.trim()) {
+      toast.error('Name and Specialty are required.');
+      return;
+    }
+    
+    setUpdating(true);
+    try {
+      const cleanName = editName.trim();
+      const cleanSpec = editSpecialty.trim();
+
+      // 1. Update doctor document
+      const docRef = doc(db, 'doctors', selectedDoctorId);
+      await updateDoc(docRef, {
+        name: cleanName,
+        specialty: cleanSpec,
+        experience: parseInt(editExperience) || 0,
+        contactNumber: `${editCountryCode} ${editContact.trim()}`,
+        description: editDescription.trim()
+      });
+
+      // 2. Batch update slots to keep denormalized data consistent
+      const slotsQ = query(collection(db, 'available_slots'), where('doctorId', '==', selectedDoctorId));
+      const slotsSnap = await getDocs(slotsQ);
+      
+      const batch = writeBatch(db);
+      slotsSnap.docs.forEach(dSnap => {
+        batch.update(dSnap.ref, {
+          doctorName: cleanName,
+          specialty: cleanSpec
+        });
+      });
+      await batch.commit();
+
+      toast.success('Doctor Profile Updated!');
+      await fetchDoctors();
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to update profile.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (Platform.OS !== 'web') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -122,15 +210,30 @@ export default function ManageDoctorSlotsScreen() {
   return (
     <div className={`flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white ${isDarkMode ? 'dark' : ''}  overflow-hidden font-sans`}>
       
-      
-
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
         
         {/* Header Row */}
-        <header className="flex flex-col gap-2 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6">
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Add Doctor Slots</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Manually publish custom 15-minute slot blocks for any doctor.</p>
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Manage Doctors</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Edit profiles or add manual slot blocks for doctors.</p>
+          </div>
+
+          <div className="flex bg-white dark:bg-[#1E293B] p-1 rounded-xl border border-gray-200 dark:border-gray-800 shrink-0">
+            <button
+              onClick={() => setActiveTab('edit')}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'edit' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+            >
+              <UserCog size={16} /> Edit Profile
+            </button>
+            <button
+              onClick={() => setActiveTab('slots')}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'slots' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+            >
+              <CalendarDays size={16} /> Add Slots
+            </button>
+          </div>
         </header>
 
         {loading ? (
@@ -154,15 +257,30 @@ export default function ManageDoctorSlotsScreen() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Target Date</label>
-                <input 
-                  type="date"
-                  required
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
-                />
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Select Doctor</label>
+                <select
+                  value={selectedDoctorId}
+                  onChange={(e) => setSelectedDoctorId(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors cursor-pointer appearance-none"
+                >
+                  {doctors.map(doc => (
+                     <option key={doc.id} value={doc.id}>{doc.name} ({doc.specialty})</option>
+                  ))}
+                </select>
               </div>
+
+              {activeTab === 'slots' ? (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Target Date</label>
+                    <input 
+                      type="date"
+                      required
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
+                    />
+                  </div>
 
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Shift Timing <span className="lowercase font-normal text-gray-500">(15 min intervals)</span></label>
@@ -193,9 +311,63 @@ export default function ManageDoctorSlotsScreen() {
                 <Clock size={18} /> Preview Shift Slots
               </button>
 
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Name</label>
+                      <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Specialty</label>
+                      <input type="text" value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Experience (Years)</label>
+                      <input type="number" value={editExperience} onChange={(e) => setEditExperience(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-2">
+                      <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Contact Number</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={editCountryCode}
+                          onChange={(e) => setEditCountryCode(e.target.value)}
+                          className="px-3 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors w-24"
+                        >
+                          <option value="+91">+91 (IN)</option>
+                          <option value="+1">+1 (US/CA)</option>
+                          <option value="+44">+44 (UK)</option>
+                          <option value="+61">+61 (AU)</option>
+                          <option value="+971">+971 (AE)</option>
+                        </select>
+                        <input type="tel" value={editContact} onChange={(e) => setEditContact(e.target.value)} className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">About / Description</label>
+                    <textarea rows="4" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors resize-none"></textarea>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleUpdateProfile}
+                    disabled={updating}
+                    className={`w-full mt-2 py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all ${updating ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-yellow-400 hover:bg-yellow-500 text-black shadow-[0_4px_15px_rgb(250,204,21,0.2)] hover:shadow-[0_6px_20px_rgb(250,204,21,0.3)] hover:-translate-y-0.5'}`}
+                  >
+                    <Save size={18} /> {updating ? 'Saving...' : 'Save Profile Changes'}
+                  </button>
+                </>
+              )}
+
             </div>
 
-            {generatedSlots.length > 0 && (
+            {activeTab === 'slots' && generatedSlots.length > 0 && (
               <div className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-3xl p-6 md:p-8 shadow-xl flex flex-col gap-6">
                 <h2 className="text-lg font-bold text-yellow-400">Preview: {generatedSlots.length} Slots Generated</h2>
                 
