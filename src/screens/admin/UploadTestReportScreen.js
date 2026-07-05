@@ -3,7 +3,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Menu, UploadCloud, FileText, Image as ImageIcon, Download, Loader2 } from 'lucide-react';
 import { Platform, View, Text } from 'react-native';
 import * as PDFLib from 'pdf-lib/dist/pdf-lib.min.js';
-const { PDFDocument, rgb } = PDFLib;
+const { PDFDocument, rgb, StandardFonts } = PDFLib;
 
 export default function UploadTestReportScreen() {
   const { isDarkMode } = useTheme();
@@ -68,28 +68,55 @@ export default function UploadTestReportScreen() {
       const logoDims = embeddedLogo.scale(0.25);
 
       const pages = pdfDoc.getPages();
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
       for (const page of pages) {
         const { width, height } = page.getSize();
 
-        // Element 1 (Address)
-        page.drawText('Address: GV Pride, 3rd Floor Gandipet Main Rd, Kokapet 500075, Telangana, India', {
-          x: 30,
+        const logoX = width - logoDims.width - 30;
+        const rightMargin = logoX - 70;
+        const textColor = rgb(0.35, 0.25, 0.15); // Dark brownish color
+
+        const text1 = 'Address:';
+        const text2 = 'GV Pride, 3rd Floor Gandipet Main Rd, Kokapet 500075, Telangana, India';
+        const text3 = 'www.yellomedi.com | yellomedi@gmail.com | @yello.medi';
+
+        const size1 = 11;
+        const size2 = 9;
+        const size3 = 9;
+
+        const width1 = fontBold.widthOfTextAtSize(text1, size1);
+        const width2 = fontRegular.widthOfTextAtSize(text2, size2);
+        const width3 = fontBold.widthOfTextAtSize(text3, size3);
+
+        page.drawText(text1, {
+          x: rightMargin - width1,
           y: height - 40,
-          size: 10,
-          color: rgb(0.3, 0.3, 0.3)
+          size: size1,
+          font: fontBold,
+          color: textColor
         });
 
-        // Element 2 (Contact)
-        page.drawText('www.yelloclinics.com | info@yelloclinics.com | @yello.medi', {
-          x: 30,
-          y: height - 55,
-          size: 10,
-          color: rgb(0.3, 0.3, 0.3)
+        page.drawText(text2, {
+          x: rightMargin - width2,
+          y: height - 58,
+          size: size2,
+          font: fontRegular,
+          color: textColor
         });
 
-        // Element 3 (Logo Image)
+        page.drawText(text3, {
+          x: rightMargin - width3,
+          y: height - 74,
+          size: size3,
+          font: fontBold,
+          color: textColor
+        });
+
+        // Logo Image
         page.drawImage(embeddedLogo, {
-          x: width - logoDims.width - 30,
+          x: logoX,
           y: height - logoDims.height - 20,
           width: logoDims.width,
           height: logoDims.height

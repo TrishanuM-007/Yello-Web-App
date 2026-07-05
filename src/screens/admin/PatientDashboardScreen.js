@@ -25,7 +25,6 @@ export default function PatientDashboardScreen({ navigation }) {
   const [newName, setNewName] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [newPhone, setNewPhone] = useState('');
-  const [newAge, setNewAge] = useState('');
   const [newGender, setNewGender] = useState('Male');
   const [newHistory, setNewHistory] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,8 +52,8 @@ export default function PatientDashboardScreen({ navigation }) {
   }, []);
 
   const handleAddPatient = async () => {
-    if (!newName.trim() || !newPhone.trim() || !newAge.trim()) {
-      toast.error('Error: Name, Phone, and Age are required.');
+    if (!newName.trim() || !newPhone.trim()) {
+      toast.error('Error: Name and Phone are required.');
       return;
     }
 
@@ -73,7 +72,6 @@ export default function PatientDashboardScreen({ navigation }) {
       await setDoc(patientRef, {
         name: newName.trim(),
         phoneNumber: phoneId,
-        age: parseInt(newAge.trim(), 10) || 0,
         gender: newGender,
         medicalHistory: newHistory.trim(),
         createdAt: new Date().toISOString()
@@ -82,7 +80,6 @@ export default function PatientDashboardScreen({ navigation }) {
       setAddModalVisible(false);
       setNewName('');
       setNewPhone('');
-      setNewAge('');
       setNewGender('Male');
       setNewHistory('');
       toast.success('Patient added successfully!');
@@ -282,7 +279,7 @@ export default function PatientDashboardScreen({ navigation }) {
                   </div>
                   
                   <div className="mt-4 pt-4 border-t border-gray-800/50 flex flex-col gap-1">
-                    <p className="text-xs text-gray-500 font-medium">{item.gender}, {item.age} yrs</p>
+                    <p className="text-xs text-gray-500 font-medium">{item.gender}</p>
                     <p className="text-xs text-gray-600">Joined: {formatDate(item.createdAt || 0)}</p>
                   </div>
                 </div>
@@ -345,16 +342,6 @@ export default function PatientDashboardScreen({ navigation }) {
               </div>
 
               <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Age <span className="text-red-500">*</span></label>
-                  <input 
-                    type="number" 
-                    value={newAge}
-                    onChange={e => setNewAge(e.target.value)}
-                    placeholder="e.g. 35"
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white outline-none focus:border-yellow-400 transition-colors"
-                  />
-                </div>
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Gender</label>
                   <select

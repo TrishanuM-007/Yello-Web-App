@@ -123,7 +123,7 @@ export default function PatientDetailsScreen({ route, navigation }) {
                  </div>
                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#0F172A] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                    <User size={14} className="text-yellow-500" />
-                   {patientData.age} yrs • {patientData.gender}
+                   {patientData.gender}
                  </div>
                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#0F172A] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                    <Calendar size={14} className="text-yellow-500" />
