@@ -6,6 +6,7 @@ import { Activity, Clock, FileText, UploadCloud, ChevronRight, CheckCircle, Sear
 import { formatDate } from '../../utils/dateUtils';
 import { Platform, View, Text } from 'react-native';
 import toast from 'react-hot-toast';
+import { Analytics } from '../../utils/analytics';
 
 const sendWhatsAppMessage = (phone, message) => {
   if (!phone || phone === 'N/A') {
@@ -171,6 +172,9 @@ export default function OngoingServicesScreen() {
         completedAt: new Date().toISOString()
       });
       toast.success('Service marked as completed!');
+      if (collectionName === 'test_requests') {
+        Analytics.track('Lab Test Completed');
+      }
 
       if (patientPhone) {
         let reviewMsg = messageSettings.feedbackTemplate || `Hi [patient_name]!\n\nThanks for visiting Yello Clinics and Diagnostics, Kokapet.\n\nIf your visit brought you comfort, a kind 5-star review would mean the world — and help others find the care they need too.\n\nReview here 💛 https://tinyurl.com/wrbr3mpd`;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Platform, View, Text } from 'react-native';
+import { Analytics } from '../utils/analytics';
 
 export default function AdminLoginScreen({ onLoginSuccess }) {
   const [passcode, setPasscode] = useState('');
@@ -16,6 +17,8 @@ export default function AdminLoginScreen({ onLoginSuccess }) {
   const handleLogin = (e) => {
     if (e) e.preventDefault();
     if (passcode === 'admin123') {
+      Analytics.identify('admin', 'Clinic Admin');
+      Analytics.track('Admin Logged In');
       if (onLoginSuccess) {
         onLoginSuccess();
       }

@@ -4,6 +4,7 @@ import { Menu, UserPlus, Image as ImageIcon, CheckCircle, Clock } from 'lucide-r
 import { Platform, View, Text } from 'react-native';
 import { db } from '../../config/firebase';
 import { collection, writeBatch, doc } from 'firebase/firestore';
+import { Analytics } from '../../utils/analytics';
 
 const SPECIALTIES = [
   'Gynecologist',
@@ -144,6 +145,7 @@ export default function AddDoctorScreen() {
       }
 
       await batch.commit();
+      Analytics.track('Doctor Profile Created');
 
       window.alert('Success: Doctor and their available slots were successfully generated!');
 
