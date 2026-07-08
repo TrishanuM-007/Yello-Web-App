@@ -9,7 +9,6 @@ import { formatDate } from '../../utils/dateUtils';
 import { Platform, View, Text } from 'react-native';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
-import { Analytics } from '../../utils/analytics';
 
 const formatDocName = (name) => {
   if (!name) return 'Dr. Unknown';
@@ -302,7 +301,6 @@ export default function MasterCalendarScreen() {
 
     try {
       await addDoc(collection(db, 'available_slots'), newSlot);
-      Analytics.track('Slot Created', { duration: slotDuration, type: calendarMode });
     } catch (err) {
       console.error('Failed to add slot', err);
     }
@@ -355,7 +353,6 @@ export default function MasterCalendarScreen() {
       setIsBookingModalOpen(false);
       setSlotToBook(null);
       toast.success('Booking Confirmed!');
-      Analytics.track('Booking Confirmed', { type: calendarMode, source: 'Master Calendar' });
     } catch (e) {
       console.error(e);
       whatsappTab.close();
@@ -370,7 +367,6 @@ export default function MasterCalendarScreen() {
       await updateDoc(doc(db, 'available_slots', slotId), {
         status: 'completed'
       });
-      Analytics.track('Patient Checked Out', { hasWhatsAppFeedbackSent: true });
       
       // Task B: Patient Checkout Review
       if (selectedBookedSlot && selectedBookedSlot.patientPhone) {
