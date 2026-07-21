@@ -162,17 +162,27 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
       const batch = writeBatch(db);
       
       for (const slot of generatedSlots) {
-        const dateString = slot.toISOString().split('T')[0];
+        const yyyy = slot.getFullYear();
+        const mm = String(slot.getMonth() + 1).padStart(2, '0');
+        const dd = String(slot.getDate()).padStart(2, '0');
+        const dateStringLocal = `${yyyy}-${mm}-${dd}`;
+
         const startStr = slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
         const endSlot = new Date(slot.getTime() + Number(slotDuration) * 60000);
         const endStr = endSlot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
         
+        const h = slot.getHours().toString().padStart(2, '0');
+        const min = slot.getMinutes().toString().padStart(2, '0');
+        const startTimestampStr = `${dateStringLocal}T${h}:${min}:00`;
+
         const slotData = {
           doctorId: currentDoctor.id,
           doctorName: currentDoctor.name,
           specialty: currentDoctor.specialty,
-          date: dateString,
+          date: dateStringLocal,
           time: `${startStr} - ${endStr}`,
+          startTimestamp: startTimestampStr,
+          duration: Number(slotDuration),
           isBooked: false,
           createdAt: new Date().toISOString()
         };
@@ -395,6 +405,7 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors appearance-none"
                     >
                       <option value={15}>15 mins</option>
+                      <option value={20}>20 mins</option>
                       <option value={30}>30 mins</option>
                       <option value={60}>60 mins</option>
                     </select>

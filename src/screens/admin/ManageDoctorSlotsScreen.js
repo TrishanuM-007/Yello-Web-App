@@ -16,6 +16,7 @@ export default function ManageDoctorSlotsScreen() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [shiftStart, setShiftStart] = useState('09:00');
   const [shiftEnd, setShiftEnd] = useState('17:00');
+  const [slotDuration, setSlotDuration] = useState(15);
   
   const [generatedSlots, setGeneratedSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +106,7 @@ export default function ManageDoctorSlotsScreen() {
     let current = startDateTime;
     while (current < endDateTime) {
       slots.push(new Date(current));
-      current.setMinutes(current.getMinutes() + 15);
+      current.setMinutes(current.getMinutes() + Number(slotDuration));
     }
     setGeneratedSlots(slots);
   };
@@ -129,16 +130,27 @@ export default function ManageDoctorSlotsScreen() {
       const dateString = date;
 
       for (const slot of generatedSlots) {
+        const yyyy = slot.getFullYear();
+        const mm = String(slot.getMonth() + 1).padStart(2, '0');
+        const dd = String(slot.getDate()).padStart(2, '0');
+        const dateStringLocal = `${yyyy}-${mm}-${dd}`;
+
         const startStr = slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
-        const endSlot = new Date(slot.getTime() + 15 * 60000);
+        const endSlot = new Date(slot.getTime() + Number(slotDuration) * 60000);
         const endStr = endSlot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase();
         
+        const h = slot.getHours().toString().padStart(2, '0');
+        const min = slot.getMinutes().toString().padStart(2, '0');
+        const startTimestampStr = `${dateStringLocal}T${h}:${min}:00`;
+
         await addDoc(slotsRef, {
           doctorId: doctor.id,
           doctorName: doctor.name,
           specialty: doctor.specialty,
-          date: dateString,
+          date: dateStringLocal,
           time: `${startStr} - ${endStr}`,
+          startTimestamp: startTimestampStr,
+          duration: Number(slotDuration),
           isBooked: false,
           createdAt: new Date().toISOString()
         });
@@ -283,7 +295,21 @@ export default function ManageDoctorSlotsScreen() {
                   </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Shift Timing <span className="lowercase font-normal text-gray-500">(15 min intervals)</span></label>
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Duration</label>
+                <select
+                  value={slotDuration}
+                  onChange={(e) => setSlotDuration(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors appearance-none"
+                >
+                  <option value={15}>15 mins</option>
+                  <option value={20}>20 mins</option>
+                  <option value={30}>30 mins</option>
+                  <option value={60}>60 mins</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Shift Timing</label>
                 <div className="flex items-center gap-3">
                   <input 
                     type="time" 
