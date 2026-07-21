@@ -12,7 +12,7 @@ const sendWhatsAppMessage = (phone, message) => {
     toast.error("No valid phone number found for this user.");
     return;
   }
-  const cleanPhone = phone.replace(/\D/g, ''); 
+  const cleanPhone = phone.replace(/\D/g, '');
   const encodedMessage = encodeURIComponent(message);
   window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
 };
@@ -21,10 +21,10 @@ export default function OngoingServicesScreen() {
   const { isDarkMode } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'tests'
-  
+
   const [ongoingAppointments, setOngoingAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
-  
+
   const [ongoingTests, setOngoingTests] = useState([]);
   const [loadingTests, setLoadingTests] = useState(true);
 
@@ -56,16 +56,16 @@ export default function OngoingServicesScreen() {
   // Fetch Ongoing Appointments
   useEffect(() => {
     const q = query(
-      collection(db, 'available_slots'), 
+      collection(db, 'available_slots'),
       where('status', '==', 'confirmed'),
       where('isBooked', '==', true)
     );
-    
+
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       try {
         const slotsWithDetails = await Promise.all(snapshot.docs.map(async (slotDoc) => {
           const slotData = slotDoc.data();
-          
+
           let patientName = 'Unknown Patient';
           let patientPhone = 'N/A';
           let doctorName = 'Unknown Doctor';
@@ -95,7 +95,7 @@ export default function OngoingServicesScreen() {
             doctorName
           };
         }));
-        
+
         slotsWithDetails.sort((a, b) => {
           if (a.date === b.date) {
             return a.time.localeCompare(b.time);
@@ -120,7 +120,7 @@ export default function OngoingServicesScreen() {
   // Fetch Ongoing Tests
   useEffect(() => {
     const q = query(collection(db, 'test_requests'), where('status', '==', 'confirmed'));
-    
+
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       try {
         const testsWithDetails = await Promise.all(snapshot.docs.map(async (docSnap) => {
@@ -144,7 +144,7 @@ export default function OngoingServicesScreen() {
             patientPhone
           };
         }));
-        
+
         testsWithDetails.sort((a, b) => new Date(b.confirmedAt || b.createdAt) - new Date(a.confirmedAt || a.createdAt));
         setOngoingTests(testsWithDetails);
         setLoadingTests(false);
@@ -163,7 +163,7 @@ export default function OngoingServicesScreen() {
   const handleCheckout = async (id, collectionName, patientId, patientPhone, patientName) => {
     const whatsappTab = window.open('about:blank', '_blank');
     setProcessingId(id);
-    
+
     try {
       const docRef = doc(db, collectionName, id);
       await updateDoc(docRef, {
@@ -175,8 +175,8 @@ export default function OngoingServicesScreen() {
       if (patientPhone) {
         let reviewMsg = messageSettings.feedbackTemplate || `Hi [patient_name]!\n\nThanks for visiting Yello Clinics and Diagnostics, Kokapet.\n\nIf your visit brought you comfort, a kind 5-star review would mean the world — and help others find the care they need too.\n\nReview here 💛 https://tinyurl.com/wrbr3mpd`;
         reviewMsg = reviewMsg.replace(/\[patient_name\]/g, patientName || 'Patient')
-                             .replace(/\[link\]/g, 'https://g.page/review/...');
-                             
+          .replace(/\[link\]/g, 'https://g.page/review/...');
+
         const cleanPhone = patientPhone.replace(/\D/g, '');
         const encodedMessage = encodeURIComponent(reviewMsg);
         whatsappTab.location.href = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
@@ -202,33 +202,31 @@ export default function OngoingServicesScreen() {
 
   return (
     <div className="flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white overflow-hidden font-sans">
-      
-      
+
+
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
-        
+
         {/* Header Row */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Ongoing Services</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">Manage active patient appointments and lab tests.</p>
           </div>
-          
+
           <div className="flex bg-white dark:bg-[#1E293B] p-1 rounded-xl border border-gray-200 dark:border-gray-800 shrink-0">
-            <button 
+            <button
               onClick={() => setActiveTab('appointments')}
-              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${
-                activeTab === 'appointments' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
-              }`}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'appointments' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
+                }`}
             >
               Appointments
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('tests')}
-              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${
-                activeTab === 'tests' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
-              }`}
+              className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'tests' ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-white'
+                }`}
             >
               Lab Tests
             </button>
@@ -237,7 +235,7 @@ export default function OngoingServicesScreen() {
 
         {/* Dynamic Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-          
+
           {activeTab === 'appointments' && (
             loadingAppointments ? (
               /* Skeleton Loaders */
@@ -270,11 +268,11 @@ export default function OngoingServicesScreen() {
                       <Stethoscope size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white">Dr. {item.doctorName}</h3>
+                      <h3 className="font-bold text-gray-900 dark:text-white">{item.doctorName}</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(item.date)} at {item.time}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col gap-2 mb-6">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Patient: {item.patientName}</p>
                     <div className="bg-yellow-400/10 text-yellow-400 text-xs font-bold px-2 py-1 rounded inline-block w-fit">
@@ -286,11 +284,10 @@ export default function OngoingServicesScreen() {
                     <button
                       disabled={processingId === item.id}
                       onClick={() => handleCheckout(item.id, 'available_slots', item.patientId, item.patientPhone, item.patientName)}
-                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${
-                        processingId === item.id 
-                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
-                          : 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white border border-green-500/20'
-                      }`}
+                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${processingId === item.id
+                        ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white border border-green-500/20'
+                        }`}
                     >
                       {processingId === item.id ? 'Processing...' : (
                         <>
@@ -341,7 +338,7 @@ export default function OngoingServicesScreen() {
                       <p className="text-xs text-gray-500 dark:text-gray-400">{item.requestedDate} at {item.requestedTime}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex-1 mb-6">
                     <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Patient</p>
                     <p className="font-medium text-gray-900 dark:text-white mb-1">{item.patientName}</p>
@@ -352,11 +349,10 @@ export default function OngoingServicesScreen() {
                     <button
                       disabled={processingId === item.id}
                       onClick={() => handleCheckout(item.id, 'test_requests', item.patientId, item.patientPhone, item.patientName)}
-                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${
-                        processingId === item.id 
-                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
-                          : 'bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20'
-                      }`}
+                      className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${processingId === item.id
+                        ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20'
+                        }`}
                     >
                       {processingId === item.id ? 'Processing...' : (
                         <>
@@ -375,7 +371,7 @@ export default function OngoingServicesScreen() {
 
       </main>
 
-      
+
 
     </div>
   );

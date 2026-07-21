@@ -290,7 +290,7 @@ export default function AddBookingScreen({ navigation }) {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate">Dr. {item.name}</h3>
+                      <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate">{item.name}</h3>
                       <p className="text-sm text-yellow-400 font-medium truncate">{item.specialty}</p>
                     </div>
                   </div>

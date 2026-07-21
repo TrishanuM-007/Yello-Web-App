@@ -560,6 +560,7 @@ export default function MasterCalendarScreen() {
                 className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm font-bold rounded-xl px-3 py-2 outline-none"
               >
                 <option value={15}>15 mins</option>
+                <option value={20}>20 mins</option>
                 <option value={30}>30 mins</option>
                 <option value={60}>60 mins</option>
               </select>
@@ -624,7 +625,7 @@ export default function MasterCalendarScreen() {
                 const calculatedHeight = event.durationInHours * 200 - 8;
                 const height = Math.max(calculatedHeight, 40);
 
-                const isShort = event.durationInHours <= 0.25;
+                const isShort = event.durationInHours <= 0.34;
 
                 if (startHour < 6 || startHour >= 24) return null;
 

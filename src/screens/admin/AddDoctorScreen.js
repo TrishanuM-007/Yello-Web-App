@@ -174,7 +174,7 @@ export default function AddDoctorScreen() {
   }
 
   return (
-    <div className={`flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-white ${isDarkMode ? 'dark' : ''}  overflow-hidden font-sans`}>
+    <div className={`flex h-screen w-full bg-gray-50 dark:bg-[#0F172A] text-gray-900 dark:text-white ${isDarkMode ? 'dark' : ''}  overflow-hidden font-sans`}>
 
 
 
@@ -182,16 +182,16 @@ export default function AddDoctorScreen() {
       <main className="flex-1 overflow-y-auto relative p-4 md:p-8 flex flex-col min-w-0">
 
         {/* Header Row */}
-        <header className="flex flex-col gap-2 mb-8 shrink-0 border-b border-gray-800 pb-6">
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">Add New Doctor</h1>
-          <p className="text-gray-400 mt-1">Create a new doctor profile and automatically generate their schedule slots.</p>
+        <header className="flex flex-col gap-2 mb-8 shrink-0 border-b border-gray-200 dark:border-gray-800 pb-6">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Add New Doctor</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Create a new doctor profile and automatically generate their schedule slots.</p>
         </header>
 
         <form onSubmit={handleAddDoctor} className="max-w-4xl w-full flex flex-col gap-6 pb-24">
 
           {/* Profile Card */}
-          <div className="bg-[#1E293B] border border-gray-800 rounded-3xl p-6 lg:p-8 shadow-xl flex flex-col gap-6">
-            <h2 className="text-xl font-bold text-white border-b border-gray-800 pb-4">1. Profile Details</h2>
+          <div className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-3xl p-6 lg:p-8 shadow-xl flex flex-col gap-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-800 pb-4">1. Profile Details</h2>
 
             <div className="flex flex-col lg:flex-row gap-8">
 
@@ -206,7 +206,7 @@ export default function AddDoctorScreen() {
                 />
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-32 h-32 rounded-full border-2 border-dashed border-gray-600 bg-[#0F172A] hover:border-yellow-400 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden group"
+                  className="w-32 h-32 rounded-full border-2 border-dashed border-gray-600 bg-white dark:bg-[#0F172A] hover:border-yellow-400 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden group"
                 >
                   {imageUrl ? (
                     <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
@@ -223,23 +223,23 @@ export default function AddDoctorScreen() {
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Doctor Name</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Doctor Name</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Dr. John Doe"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors"
+                    className="w-full px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Specialty</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Specialty</label>
                   <select
                     value={specialty}
                     onChange={(e) => setSpecialty(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors cursor-pointer appearance-none"
+                    className="w-full px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors cursor-pointer appearance-none"
                   >
                     {SPECIALTIES.map(spec => (
                       <option key={spec} value={spec}>{spec}</option>
@@ -248,24 +248,24 @@ export default function AddDoctorScreen() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Experience (Years)</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Experience (Years)</label>
                   <input
                     type="number"
                     required
                     placeholder="e.g. 10"
                     value={experience}
                     onChange={(e) => setExperience(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors"
+                    className="w-full px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Contact Number</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Contact Number</label>
                   <div className="flex gap-2">
                     <select
                       value={countryCode}
                       onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-3 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors w-24"
+                      className="px-3 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors w-24"
                     >
                       <option value="+91">+91 (IN)</option>
                       <option value="+1">+1 (US/CA)</option>
@@ -279,20 +279,20 @@ export default function AddDoctorScreen() {
                       placeholder="e.g. 9876543210"
                       value={contactNumber}
                       onChange={(e) => setContactNumber(e.target.value)}
-                      className="flex-1 px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors"
+                      className="flex-1 px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                     />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Professional Description</label>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Professional Description</label>
                   <textarea
                     required
                     placeholder="Enter a brief bio..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
-                    className="w-full px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors resize-none"
+                    className="w-full px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors resize-none"
                   />
                 </div>
 
@@ -301,22 +301,22 @@ export default function AddDoctorScreen() {
           </div>
 
           {/* Schedule Configuration Card */}
-          <div className="bg-[#1E293B] border border-gray-800 rounded-3xl p-6 lg:p-8 shadow-xl flex flex-col gap-6">
-            <h2 className="text-xl font-bold text-white border-b border-gray-800 pb-4 flex items-center gap-3">
+          <div className="bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-gray-800 rounded-3xl p-6 lg:p-8 shadow-xl flex flex-col gap-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-800 pb-4 flex items-center gap-3">
               2. Schedule Configuration <Clock size={20} className="text-yellow-400" />
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Shift Timing</label>
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Shift Timing</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="time"
                     required
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors"
+                    className="flex-1 px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                   />
                   <span className="text-gray-500 font-medium">to</span>
                   <input
@@ -324,19 +324,20 @@ export default function AddDoctorScreen() {
                     required
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors"
+                    className="flex-1 px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Consultation Duration</label>
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Consultation Duration</label>
                 <select
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors cursor-pointer appearance-none"
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors cursor-pointer appearance-none"
                 >
                   <option value="15">15 minutes</option>
+                  <option value="20">20 minutes</option>
                   <option value="30">30 minutes</option>
                   <option value="45">45 minutes</option>
                   <option value="60">60 minutes</option>
@@ -344,7 +345,7 @@ export default function AddDoctorScreen() {
               </div>
 
               <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider pl-1">Days to Generate in Advance</label>
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Days to Generate in Advance</label>
                 <input
                   type="number"
                   required
@@ -352,7 +353,7 @@ export default function AddDoctorScreen() {
                   max="90"
                   value={daysInAdvance}
                   onChange={(e) => setDaysInAdvance(e.target.value)}
-                  className="w-full md:w-1/2 px-4 py-3 bg-[#0F172A] border border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-white transition-colors"
+                  className="w-full md:w-1/2 px-4 py-3 bg-white dark:bg-[#0F172A] border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors"
                 />
                 <p className="text-xs text-gray-500 mt-1 pl-1">This will automatically bulk-create available slots for the next {daysInAdvance || 0} days.</p>
               </div>

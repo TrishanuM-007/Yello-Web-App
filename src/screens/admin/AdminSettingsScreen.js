@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../config/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import { migrateFutureSlots } from '../../utils/migrateTo20MinSlots';
 
 export default function AdminSettingsScreen({ navigation }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -47,6 +48,21 @@ export default function AdminSettingsScreen({ navigation }) {
       toast.error('Failed to save templates.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  const handleMigration = async () => {
+    if (!window.confirm("Are you sure you want to run the 20-min slot migration? This will update all future slots.")) return;
+    setIsMigrating(true);
+    try {
+      await migrateFutureSlots();
+      toast.success("Migration complete! Future slots updated to 20 mins.");
+    } catch (e) {
+      toast.error("Migration failed.");
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -160,7 +176,15 @@ export default function AdminSettingsScreen({ navigation }) {
           </div>
 
           {/* Danger Zone */}
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-between items-center">
+            <button 
+              onClick={handleMigration}
+              disabled={isMigrating}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-sm ${isMigrating ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-orange-500/10 text-orange-600 border border-orange-500/20 hover:bg-orange-500 hover:text-white'}`}
+            >
+              {isMigrating ? 'Migrating...' : 'Run 20-Min Migration'}
+            </button>
+
             <button 
               onClick={handleLogout}
               className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all shadow-sm"
