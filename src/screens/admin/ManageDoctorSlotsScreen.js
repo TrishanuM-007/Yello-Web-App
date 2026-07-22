@@ -6,6 +6,17 @@ import { Menu, CalendarDays, CheckCircle, Clock, UserCog, Save } from 'lucide-re
 import { Platform, View, Text } from 'react-native';
 import toast from 'react-hot-toast';
 
+const SPECIALTIES = [
+  'Gynecologist',
+  'Pediatrician',
+  'Radiology',
+  'Psychiatrist',
+  'Chiropractor & Physiotherapist',
+  'General Physician',
+  'Dentist',
+  'Orthopedic'
+];
+
 export default function ManageDoctorSlotsScreen() {
   const { isDarkMode } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -347,7 +358,16 @@ export default function ManageDoctorSlotsScreen() {
                     </div>
                     <div className="flex-1 flex flex-col gap-2">
                       <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-1">Specialty</label>
-                      <input type="text" value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors" />
+                      <select 
+                        value={editSpecialty} 
+                        onChange={(e) => setEditSpecialty(e.target.value)} 
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:border-yellow-400 text-gray-900 dark:text-white transition-colors appearance-none cursor-pointer"
+                      >
+                        <option value="" disabled>Select Specialty</option>
+                        {SPECIALTIES.map(spec => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 

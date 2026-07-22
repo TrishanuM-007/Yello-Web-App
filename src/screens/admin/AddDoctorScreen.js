@@ -10,9 +10,10 @@ const SPECIALTIES = [
   'Pediatrician',
   'Radiology',
   'Psychiatrist',
-  'Physiology',
+  'Chiropractor & Physiotherapist',
   'General Physician',
-  'Dentist'
+  'Dentist',
+  'Orthopedic'
 ];
 
 export default function AddDoctorScreen() {
