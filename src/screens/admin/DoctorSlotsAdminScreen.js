@@ -106,6 +106,43 @@ export default function DoctorSlotsAdminScreen({ route, navigation }) {
     return () => unsubscribe();
   }, [currentDoctor.id]);
 
+  // Background cleanup for past unbooked slots
+  useEffect(() => {
+    if (!currentDoctor || !currentDoctor.id) return;
+    
+    const cleanupPastSlots = async () => {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const q = query(
+          collection(db, 'available_slots'),
+          where('doctorId', '==', currentDoctor.id),
+          where('isBooked', '==', false)
+        );
+        
+        const snap = await getDocs(q);
+        const batch = writeBatch(db);
+        let deletedCount = 0;
+        
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.date && data.date < todayStr) {
+            batch.delete(docSnap.ref);
+            deletedCount++;
+          }
+        });
+        
+        if (deletedCount > 0) {
+          await batch.commit();
+          console.log(`Cleaned up ${deletedCount} past unbooked slots.`);
+        }
+      } catch (err) {
+        console.error("Error cleaning up past slots: ", err);
+      }
+    };
+    
+    cleanupPastSlots();
+  }, [currentDoctor.id]);
+
   useEffect(() => {
     if (slots.length > 0) {
       const lastSlot = slots[slots.length - 1];

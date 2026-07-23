@@ -277,9 +277,12 @@ export default function AddBookingScreen({ navigation }) {
               mergedDoctors.map(item => (
                 <div
                   key={item.id}
-                  onClick={() => item.hasSlots && handleOpenDoctorModal(item)}
-                  className={`bg-white dark:bg-[#1E293B] border rounded-2xl p-5 transition-all flex flex-col ${item.hasSlots ? 'border-gray-200 dark:border-gray-800 hover:border-gray-600 cursor-pointer hover:-translate-y-1 hover:shadow-lg' : 'border-gray-800/50 opacity-60 cursor-not-allowed'
-                    }`}
+                  onClick={() => navigation.navigate('MasterCalendar', { selectedDoctorId: item.id, date: new Date().toISOString().split('T')[0] })}
+                  className={`bg-white dark:bg-[#1E293B] border rounded-2xl p-5 transition-all flex flex-col cursor-pointer hover:-translate-y-1 hover:shadow-lg ${
+                    item.hasSlots 
+                      ? 'border-gray-200 dark:border-gray-800 hover:border-gray-600' 
+                      : 'border-gray-800/50 opacity-60'
+                  }`}
                 >
                   <div className="flex items-center gap-4 mb-4">
                     {item.imageUrl ? (

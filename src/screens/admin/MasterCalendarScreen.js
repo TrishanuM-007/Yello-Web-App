@@ -33,8 +33,19 @@ const getLocalDateString = (dateObj) => {
   return `${year}-${month}-${day}`; 
 };
 
-export default function MasterCalendarScreen() {
+export default function MasterCalendarScreen({ route, navigation }) {
   const { isDarkMode } = useTheme();
+
+  useEffect(() => {
+    if (route?.params?.selectedDoctorId) {
+      setSelectedDoctorId(route.params.selectedDoctorId);
+    }
+    if (route?.params?.date) {
+      const d = new Date(route.params.date);
+      setSelectedDate(d);
+      setCurrentMonth(d);
+    }
+  }, [route?.params]);
 
   // 1. Core State
   const [selectedDate, setSelectedDate] = useState(new Date());
